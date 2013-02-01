@@ -1,0 +1,87 @@
+//
+// Copyright (c) 2013 Jon Escombe
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
+//
+// Inbound control (request) message has the format:
+//
+// Byte          Value / Meaning
+//
+// 0             0xAA CONSTANT (device code)
+// 1             0x01 CONSTANT (version code)
+// 2             Mode - 0x01 = ergo, 0x02 = slope, 0x4 = calibrate -- ever used inbound?
+// 3             Buttons - 0x01 = Enter, 0x02 = Minus, 0x04 = Plus, 0x08 = Cancel
+// 4             Target gradient - (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
+// 5             Target power - Lo Byte
+// 6             Target power - Hi Byte
+// 7             Realtime speed - Lo Byte
+// 8			 Realtime speed - Hi Byte
+// 9			 Realtime power - Lo Byte
+// 10			 Realtime power - Hi Byte
+// 11			 0x00 -- UNUSED
+// 12			 0x00 -- UNUSED
+// 13			 0x00 -- UNUSED
+// 14			 0x00 -- UNUSED
+// 15			 0x00 -- UNUSED
+//
+//
+// Outbound status (response) message has the format:
+//
+// Byte          Value / Meaning
+//
+// 0             0xAA CONSTANT
+// 1             0x01 CONSTANT
+// 2             Buttons - 0x01 = Enter, 0x02 = Minus, 0x04 = Plus, 0x08 = Cancel
+// 3             Target motor position (1 to 100)
+// 4             Current motor position (1 to 100)
+// 5             0x00 -- UNUSED
+
+//#include <stdio.h>
+//#include <stdlib.h>
+//#include <string.h>
+#include <avr/io.h>
+//#include <avr/sleep.h>
+//#include <avr/interrupt.h>
+#include <avr/power.h>
+//#include <util/delay.h>
+
+#define USART_BAUDRATE 2400
+#define USART_BAUD_PRESCALE (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
+
+#define BT_REQUEST_SIZE 16
+#define BT_RESPONSE_SIZE 6
+
+typedef struct TrainerData
+{
+	uint8_t		mode;
+	uint8_t		buttons;
+
+	uint8_t 	target_gradient;
+	uint16_t	target_load;
+
+	uint8_t		target_position;
+	uint8_t		current_position;
+
+	uint16_t	current_speed;
+	uint16_t	current_power;
+} TrainerData;
+
+
+
