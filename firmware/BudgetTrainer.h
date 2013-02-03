@@ -29,8 +29,8 @@
 // 2             Mode - 0x01 = ergo, 0x02 = slope, 0x4 = calibrate -- ever used inbound?
 // 3             Buttons - 0x01 = Enter, 0x02 = Minus, 0x04 = Plus, 0x08 = Cancel
 // 4             Target gradient - (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
-// 5             Target power - Lo Byte
-// 6             Target power - Hi Byte
+// 5             Target load - Lo Byte
+// 6             Target load - Hi Byte
 // 7             Realtime speed - Lo Byte
 // 8			 Realtime speed - Hi Byte
 // 9			 Realtime power - Lo Byte

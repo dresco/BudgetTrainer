@@ -106,17 +106,17 @@ void ProcessControlMessage(uint8_t *buf, TrainerData *data)
 	data->mode = buf[2];
 	data->target_gradient = buf[4];
 
-	data->target_load = buf[5];
+	data->target_load = buf[6];
 	data->target_load <<= 8;
-	data->target_load |= buf[6];
+	data->target_load |= buf[5];
 
-	data->current_speed = buf[7];
+	data->current_speed = buf[8];
 	data->current_speed <<= 8;
-	data->current_speed |= buf[8];
+	data->current_speed |= buf[7];
 
-	data->current_power = buf[9];
+	data->current_power = buf[10];
 	data->current_power <<= 8;
-	data->current_power |= buf[10];
+	data->current_power |= buf[9];
 }
 
 void PrepareStatusMessage(uint8_t *buf, TrainerData *data)
