@@ -64,7 +64,6 @@ void USART_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
 	}
 }
 
-
 void SetupHardware()
 {
 	clock_prescale_set(clock_div_1);					// Disable clock prescaler (for 8MHz operation)
@@ -76,7 +75,6 @@ void ReadData(uint8_t *buf, uint8_t size)
 {
 	USART_ReadBuffer(buf, size);
 }
-
 
 void WriteData(uint8_t *buf, uint8_t size)
 {
@@ -131,7 +129,6 @@ void PrepareStatusMessage(uint8_t *buf, TrainerData *data)
 
 int main()
 {
-
 	uint8_t RequestBuffer[BT_REQUEST_SIZE];
 	uint8_t ResponseBuffer[BT_RESPONSE_SIZE];
 

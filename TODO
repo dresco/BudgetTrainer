@@ -1,0 +1,18 @@
+
+software:
+
+ -
+
+firmware:
+
+ - import servo positioning code from test harness
+ - add rate limiting to positioning code (don't stress the motor/cable/trainer)
+ - rewrite button code from test harness (h/w interrupt & debounce)
+ - initial calibration attempt
+ - migrate to USB part
+ - move hard coded calibration data to EEPROM and configure from PC
+
+hardware:
+
+ -
+
