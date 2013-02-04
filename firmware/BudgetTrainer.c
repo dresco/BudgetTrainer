@@ -23,10 +23,27 @@
 
 void USART_Setup(void)
 {
-   UCSR0B |= (1 << TXEN0) | (1 << RXEN0);       // Turn on the transmit / receive circuitry
+	UCSR0B |= (1 << TXEN0) | (1 << RXEN0);       		// Turn on the transmit / receive circuitry
 
-   UBRR0L = USART_BAUD_PRESCALE;                // Load lower 8-bits of the baud rate register
-   UBRR0H = (USART_BAUD_PRESCALE >> 8);         // Load upper 8-bits of the baud rate register
+	UBRR0L = USART_BAUD_PRESCALE;                		// Load lower 8-bits of the baud rate register
+	UBRR0H = (USART_BAUD_PRESCALE >> 8);         		// Load upper 8-bits of the baud rate register
+}
+
+void TimerSetup(void)
+{
+	TCCR1B |= (1 << WGM13);								// Configure timer for PWM Mode 8 (phase and frequency correct)
+	ICR1 = SERVO_INTERVAL;								// Set TOP value for the wave form to 20ms
+	OCR1A = SERVO_MIDPOINT;								// Set output compare value to 1.5ms pulse (mid point)
+	TCCR1A |= ((1 << COM1A1));							// Clear OC1A on upcount compare and set on downcount compare
+	TIMSK1 |= (1 << TOIE1);								// Interrupt at bottom - TIMER1_OVF_vect
+
+	TCCR1B |= (1 << CS11);								// Start timer with prescaler of 8 = 1MHz timer
+}
+
+void PortSetup()
+{
+	DDRB |= (1 << 0);									// Set port B0 as output for debug LED
+	DDRB |= (1 << PB1);									// Enable output on PINB1 (OC1A)
 }
 
 uint8_t USART_GetChar(void)
@@ -69,6 +86,10 @@ void SetupHardware()
 	clock_prescale_set(clock_div_1);					// Disable clock prescaler (for 8MHz operation)
 
 	USART_Setup();
+	TimerSetup();
+	PortSetup();
+
+	sei();												// Enable global interrupts
 }
 
 void ReadData(uint8_t *buf, uint8_t size)
@@ -91,9 +112,48 @@ void CalculatePosition()
 
 }
 
-void MotorController()
+void MotorController(TrainerData *data)
 {
+	uint8_t		target_position;
+	uint8_t		current_position;
 
+	double x_axis, angle_rad, angle_deg;
+
+	angle_rad = asin(X_AXIS_MAX);						// Maximum rotational angle in radians
+	angle_deg = angle_rad * 180/ M_PI;					// Convert radians to degrees
+
+	target_position = data->target_position;
+	current_position = data->current_position;
+
+	printf("max x_axis %f\n", X_AXIS_MAX);
+	printf("max angle_rad %f\n", angle_rad);
+	printf("max angle_deg %f\n", angle_deg);
+
+	if ((target_position >= 1) && ( target_position <= SERVO_RES))
+	{
+		printf("Target position %i\n", target_position);
+
+		// CHECK MY MATHS :)
+		x_axis = (X_AXIS_MAX *
+				  (target_position-SERVO_MIDSTEP))   	// position should be signed plus/minus around the mid-point,
+				  / (SERVO_MIDSTEP-1);					// divided by the number of steps each side
+														// Check also correct for even numbers of steps?
+
+		angle_rad = asin(x_axis);						// Required rotational angle in radians
+		angle_deg = angle_rad * 180/ M_PI;				// Convert radians to degrees
+
+		OCR1A = SERVO_MIDPOINT - (angle_deg *			// Timing value to get servo rotation to
+								SERVO_DEGREE);			//   required angle (in given direction)
+
+		printf("Setting x_axis to %f, arm angle to %f, servo pulse to %i\n", x_axis, angle_deg, OCR1A);
+		current_position = target_position;
+		data->target_position = target_position;
+		data->current_position = current_position;
+	}
+	else
+	{
+		printf("Invalid entry, please try again...\n");
+	}
 }
 
 void ProcessControlMessage(uint8_t *buf, TrainerData *data)
@@ -127,6 +187,20 @@ void PrepareStatusMessage(uint8_t *buf, TrainerData *data)
 	buf[4] = data->current_position;
 }
 
+ISR(TIMER1_OVF_vect)
+{
+	PORTB ^= (1 << 0);						  			// Toggle the debug LED on port B0
+}
+
+static int uart_putc(char c, FILE *unused)
+{
+    while (!(UCSR0A & (1<<UDRE0)));
+    UDR0 = c;
+    return 0;
+}
+
+FILE uart_str = FDEV_SETUP_STREAM(uart_putc, NULL, _FDEV_SETUP_WRITE);
+
 int main()
 {
 	uint8_t RequestBuffer[BT_REQUEST_SIZE];
@@ -135,6 +209,8 @@ int main()
 	TrainerData data;
 
 	SetupHardware();
+
+	stdout = &uart_str;									// redirect printf and scanf to UART for debug output
 
 	while(1)
 	{
@@ -147,7 +223,7 @@ int main()
 		CalculatePosition();
 
 		// move motor towards required position
-		MotorController();
+		MotorController(&data);
 
 		// get the current button status
 		GetButtonStatus(&data);
