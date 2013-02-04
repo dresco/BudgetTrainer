@@ -21,6 +21,50 @@
 
 #include "BudgetTrainer.h"
 
+void MotorController(TrainerData *data)
+{
+    uint8_t target_position;
+    uint8_t current_position;
+
+    double x_axis, angle_rad, angle_deg;
+
+    //angle_rad = asin(X_AXIS_MAX);                       // Maximum rotational angle in radians
+    //angle_deg = angle_rad * 180 / M_PI;                 // Convert radians to degrees
+    //printf("max x_axis %f\n", X_AXIS_MAX);
+    //printf("max angle_rad %f\n", angle_rad);
+    //printf("max angle_deg %f\n", angle_deg);
+
+    target_position = data->target_position;
+    current_position = data->current_position;
+
+    if ((target_position >= 1) && (target_position <= SERVO_RES))
+    {
+        printf("Target position %i\n", target_position);
+
+        // CHECK MY MATHS :)
+        x_axis = (X_AXIS_MAX *
+                 (target_position - SERVO_MIDSTEP))     // position should be signed plus/minus around the mid-point,
+                 / (SERVO_MIDSTEP - 1);                 // divided by the number of steps each side
+                                                        // Check also correct for even numbers of steps?
+
+        angle_rad = asin(x_axis);                       // Required rotational angle in radians
+        angle_deg = angle_rad * 180 / M_PI;             // Convert radians to degrees
+
+        OCR1A = SERVO_MIDPOINT - (angle_deg *           // Timing value to get servo rotation to
+                SERVO_DEGREE);                          //   required angle (in given direction)
+
+        printf("Setting x_axis to %f, arm angle to %f, servo pulse to %i\n",
+                x_axis, angle_deg, OCR1A);
+        current_position = target_position;
+        //data->target_position = target_position;
+        data->current_position = current_position;
+    }
+    else
+    {
+        printf("Invalid entry, please try again...\n");
+    }
+}
+
 void USART_Setup(void)
 {
     UCSR0B |= (1 << TXEN0) | (1 << RXEN0);              // Turn on the transmit / receive circuitry
@@ -33,7 +77,7 @@ void TimerSetup(void)
 {
     TCCR1B |= (1 << WGM13);                             // Configure timer for PWM Mode 8 (phase and frequency correct)
     ICR1 = SERVO_INTERVAL;                              // Set TOP value for the wave form to 20ms
-    OCR1A = SERVO_MIDPOINT;                             // Set output compare value to 1.5ms pulse (mid point)
+    //OCR1A = SERVO_MIDPOINT;                             // Set output compare value to 1.5ms pulse (mid point)
     TCCR1A |= ((1 << COM1A1));                          // Clear OC1A on upcount compare and set on downcount compare
     TIMSK1 |= (1 << TOIE1);                             // Interrupt at bottom - TIMER1_OVF_vect
 
@@ -81,13 +125,17 @@ void USART_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
     }
 }
 
-void SetupHardware()
+void SetupHardware(TrainerData *data)
 {
     clock_prescale_set(clock_div_1);                    // Disable clock prescaler (for 8MHz operation)
 
     USART_Setup();
-    TimerSetup();
     PortSetup();
+
+    data->target_position = 1;                          // Set the initial arm position to minimum before we
+    MotorController(data);                              // enable the timer or servo control
+
+    TimerSetup();
 
     sei();                                              // Enable global interrupts
 }
@@ -107,54 +155,19 @@ void GetButtonStatus(TrainerData *data)
     data->buttons = 0;
 }
 
-void CalculatePosition()
+void CalculatePosition(TrainerData *data)
 {
-
-}
-
-void MotorController(TrainerData *data)
-{
-    uint8_t target_position;
-    uint8_t current_position;
-
-    double x_axis, angle_rad, angle_deg;
-
-    angle_rad = asin(X_AXIS_MAX);                       // Maximum rotational angle in radians
-    angle_deg = angle_rad * 180 / M_PI;                 // Convert radians to degrees
-
-    target_position = data->target_position;
-    current_position = data->current_position;
-
-    printf("max x_axis %f\n", X_AXIS_MAX);
-    printf("max angle_rad %f\n", angle_rad);
-    printf("max angle_deg %f\n", angle_deg);
-
-    if ((target_position >= 1) && (target_position <= SERVO_RES))
+    if (data->mode == BT_SSMODE)
     {
-        printf("Target position %i\n", target_position);
-
-        // CHECK MY MATHS :)
-        x_axis = (X_AXIS_MAX *
-                 (target_position - SERVO_MIDSTEP))     // position should be signed plus/minus around the mid-point,
-                 / (SERVO_MIDSTEP - 1);                 // divided by the number of steps each side
-                                                        // Check also correct for even numbers of steps?
-
-        angle_rad = asin(x_axis);                       // Required rotational angle in radians
-        angle_deg = angle_rad * 180 / M_PI;             // Convert radians to degrees
-
-        OCR1A = SERVO_MIDPOINT - (angle_deg *           // Timing value to get servo rotation to
-                SERVO_DEGREE);                          //   required angle (in given direction)
-
-        printf("Setting x_axis to %f, arm angle to %f, servo pulse to %i\n",
-                x_axis, angle_deg, OCR1A);
-        current_position = target_position;
-        data->target_position = target_position;
-        data->current_position = current_position;
+        // in slope mode, perform some mapping between gradient
+        // and motor position..
+        // Target gradient - (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
     }
-    else
+    if (data->mode == BT_ERGOMODE)
     {
-        printf("Invalid entry, please try again...\n");
+        // in ergo mode
     }
+
 }
 
 void ProcessControlMessage(uint8_t *buf, TrainerData *data)
@@ -208,7 +221,7 @@ int main()
 
     TrainerData data;
 
-    SetupHardware();
+    SetupHardware(&data);
 
     stdout = &uart_str;                                 // redirect printf and scanf to UART for debug output
 
@@ -220,7 +233,7 @@ int main()
         ProcessControlMessage(RequestBuffer, &data);
 
         // calculate required motor position
-        CalculatePosition();
+        CalculatePosition(&data);
 
         // move motor towards required position
         MotorController(&data);
