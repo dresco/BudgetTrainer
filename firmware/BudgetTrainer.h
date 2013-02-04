@@ -32,14 +32,14 @@
 // 5             Target load - Lo Byte
 // 6             Target load - Hi Byte
 // 7             Realtime speed - Lo Byte
-// 8			 Realtime speed - Hi Byte
-// 9			 Realtime power - Lo Byte
-// 10			 Realtime power - Hi Byte
-// 11			 0x00 -- UNUSED
-// 12			 0x00 -- UNUSED
-// 13			 0x00 -- UNUSED
-// 14			 0x00 -- UNUSED
-// 15			 0x00 -- UNUSED
+// 8             Realtime speed - Hi Byte
+// 9             Realtime power - Lo Byte
+// 10            Realtime power - Hi Byte
+// 11            0x00 -- UNUSED
+// 12            0x00 -- UNUSED
+// 13            0x00 -- UNUSED
+// 14            0x00 -- UNUSED
+// 15            0x00 -- UNUSED
 //
 //
 // Outbound status (response) message has the format:
@@ -71,30 +71,26 @@
 
 typedef struct TrainerData
 {
-	uint8_t		mode;
-	uint8_t		buttons;
+    uint8_t mode;
+    uint8_t buttons;
 
-	uint8_t 	target_gradient;
-	uint16_t	target_load;
+    uint8_t target_gradient;
+    uint16_t target_load;
 
-	uint8_t		target_position;
-	uint8_t		current_position;
+    uint8_t target_position;
+    uint8_t current_position;
 
-	uint16_t	current_speed;
-	uint16_t	current_power;
+    uint16_t current_speed;
+    uint16_t current_power;
 } TrainerData;
 
-#define SERVO_INTERVAL	10000							// 20ms (1MHz timer, 10ms up & 10ms down)
-#define SERVO_MIDPOINT	750								// 1.5ms output pulse (1,500 us) for centre angle
-#define SERVO_MAX_DIFF	300								// 0.6ms change in output pulse for max angle
-#define SERVO_DEGREE	5.5555							// 5.555us per degree of rotation (1000/180)
-
-#define ARM_RADIUS		13.5							// Effective radius of the servo arm in mm
-#define LINEAR_TRAVEL	15								// Required linear travel in mm
-#define X_AXIS_MAX		(LINEAR_TRAVEL/ARM_RADIUS)/2	// Maximum point on x-axis (unit circle)
-
-#define SERVO_RES		100.00							// Target resolution of 100 positions (99 steps between so make it a double)
-#define SERVO_MIDSTEP	(SERVO_RES+1)/2					// Assuming starting at 1, there are 99 steps, mid-way is 50.5
-
-
+#define SERVO_INTERVAL      10000                       // 20ms (1MHz timer, 10ms up & 10ms down)
+#define SERVO_MIDPOINT      750                         // 1.5ms output pulse (1,500 us) for centre angle
+#define SERVO_MAX_DIFF      300                         // 0.6ms change in output pulse for max angle
+#define SERVO_DEGREE        5.5555                      // 5.555us per degree of rotation (1000/180)
+#define ARM_RADIUS          13.5                        // Effective radius of the servo arm in mm
+#define LINEAR_TRAVEL       15                          // Required linear travel in mm
+#define X_AXIS_MAX          (LINEAR_TRAVEL/ARM_RADIUS)/2// Maximum point on x-axis (unit circle)
+#define SERVO_RES           100.00                      // Target resolution of 100 positions (99 steps between so make it a double)
+#define SERVO_MIDSTEP       (SERVO_RES+1)/2             // Assuming starting at 1, there are 99 steps, mid-way is 50.5
 
