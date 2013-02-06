@@ -21,8 +21,14 @@
 
 #include "BudgetTrainer.h"
 
+// volatile globals - accessed from interrupt handlers
+volatile uint8_t buttons = 0;
+
 void MotorController(TrainerData *data)
 {
+    // todo: add some rate limiting code to slow large arm movements,
+    //       reducing stress & load on the physical components
+
     uint8_t target_position;
     uint8_t current_position;
 
@@ -88,6 +94,11 @@ void PortSetup()
 {
     DDRB |= (1 << 0);                                   // Set port B0 as output for debug LED
     DDRB |= (1 << PB1);                                 // Enable output on PINB1 (OC1A)
+
+    PORTC |= (1 << 0);                                  // Enable pullup resistor on port C0 (Enter)
+    PORTC |= (1 << 1);                                  // Enable pullup resistor on port C1 (Minus)
+    PORTC |= (1 << 2);                                  // Enable pullup resistor on port C2 (Plus)
+    PORTC |= (1 << 3);                                  // Enable pullup resistor on port C3 (Cancel)
 }
 
 uint8_t USART_GetChar(void)
@@ -133,7 +144,7 @@ void SetupHardware(TrainerData *data)
     PortSetup();
 
     data->target_position = 1;                          // Set the initial arm position to minimum before we
-    MotorController(data);                              // enable the timer or servo control
+    MotorController(data);                              // enable the timer for servo control
 
     TimerSetup();
 
@@ -143,6 +154,15 @@ void SetupHardware(TrainerData *data)
 void ReadData(uint8_t *buf, uint8_t size)
 {
     USART_ReadBuffer(buf, size);
+    if ((buf[0] != 0xAA) || (buf[1] != 0x01))
+    {
+        // if we're here then the packet contains unexpected data, just log for now
+        printf("packet contains unexpected data\n");
+
+        // todo: handle this situation, possibly means we're out of sync
+        //       and receiving part way though a packet? read in the remaining
+        //       bytes until we get back in sync?
+    }
 }
 
 void WriteData(uint8_t *buf, uint8_t size)
@@ -152,7 +172,8 @@ void WriteData(uint8_t *buf, uint8_t size)
 
 void GetButtonStatus(TrainerData *data)
 {
-    data->buttons = 0;
+    data->buttons = buttons;
+    buttons = 0;
 }
 
 void CalculatePosition(TrainerData *data)
@@ -172,23 +193,27 @@ void CalculatePosition(TrainerData *data)
 
 void ProcessControlMessage(uint8_t *buf, TrainerData *data)
 {
-    // pull the inbound telemetry data out of the packet buffer and into
-    // our internal data structure..
+    // make sure it's a valid packet before retrieving data
+    if ((buf[0] == 0xAA) && (buf[1] == 0x01))
+    {
+        // pull the inbound telemetry data out of the packet buffer and into
+        // our internal data structure..
 
-    data->mode = buf[2];
-    data->target_gradient = buf[4];
+        data->mode = buf[2];
+        data->target_gradient = buf[4];
 
-    data->target_load = buf[6];
-    data->target_load <<= 8;
-    data->target_load |= buf[5];
+        data->target_load = buf[6];
+        data->target_load <<= 8;
+        data->target_load |= buf[5];
 
-    data->current_speed = buf[8];
-    data->current_speed <<= 8;
-    data->current_speed |= buf[7];
+        data->current_speed = buf[8];
+        data->current_speed <<= 8;
+        data->current_speed |= buf[7];
 
-    data->current_power = buf[10];
-    data->current_power <<= 8;
-    data->current_power |= buf[9];
+        data->current_power = buf[10];
+        data->current_power <<= 8;
+        data->current_power |= buf[9];
+    }
 }
 
 void PrepareStatusMessage(uint8_t *buf, TrainerData *data)
@@ -203,7 +228,31 @@ void PrepareStatusMessage(uint8_t *buf, TrainerData *data)
 
 ISR( TIMER1_OVF_vect)
 {
-    PORTB ^= (1 << 0);                                  // Toggle the debug LED on port B0
+    static uint8_t count = 0;
+    uint8_t i;
+
+    // we get here every 20ms, so process buttons every 5th interval for 10Hz
+    // - just ensuring it's more frequent than the comms with the PC to ensure
+    //   we can pass new button data every time..
+    if (++count == 5)
+    {
+        count = 0;
+        PORTB ^= (1 << 0);                                  // Toggle the debug LED on port B0
+
+        // save the state of PINS C0 to C3
+        // todo: add debouncing
+        //
+        // C0 - Enter
+        // C1 - Minus
+        // C2 - Plus
+        // C3 - Cancel
+        //
+        for (i=0 ; i<4 ; i++)
+        {
+            if (!(PINC & (1<<i)))
+                buttons |= (1<<i);
+        }
+    }
 }
 
 static int uart_putc(char c, FILE *unused)
@@ -212,6 +261,7 @@ static int uart_putc(char c, FILE *unused)
     UDR0 = c;
     return 0;
 }
+
 FILE uart_str = FDEV_SETUP_STREAM(uart_putc, NULL, _FDEV_SETUP_WRITE);
 
 int main()
@@ -228,6 +278,7 @@ int main()
     while (1)
     {
         // read the control message from the pc
+        // todo: currently blocks forever, add timeout
         ReadData(RequestBuffer, BT_REQUEST_SIZE);
 
         ProcessControlMessage(RequestBuffer, &data);
