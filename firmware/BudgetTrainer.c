@@ -198,11 +198,25 @@ void GetButtonStatus(TrainerData *data)
 
 void CalculatePosition(TrainerData *data)
 {
+    uint8_t position;
+
     if (data->mode == BT_SSMODE)
     {
+        PORTB ^= (1 << 0);                                  // Toggle the debug LED on port B0
+
         // in slope mode, perform some mapping between gradient
         // and motor position..
         // Target gradient - (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
+
+        // for initial testing, just linear mapping between slope and position
+        position = data->target_gradient / 2.5;
+
+        if (position < 1)
+            position = 1;
+        if (position > SERVO_RES)
+            position = SERVO_RES;
+
+        data->target_position = position;
     }
     if (data->mode == BT_ERGOMODE)
     {
@@ -218,7 +232,6 @@ void ProcessControlMessage(uint8_t *buf, TrainerData *data)
     {
         // pull the inbound telemetry data out of the packet buffer and into
         // our internal data structure..
-
         data->mode = buf[2];
         data->target_gradient = buf[4];
 
@@ -257,7 +270,7 @@ ISR( TIMER1_OVF_vect)
     if (++count == 5)
     {
         count = 0;
-        PORTB ^= (1 << 0);                                  // Toggle the debug LED on port B0
+//        PORTB ^= (1 << 0);                                  // Toggle the debug LED on port B0
 
         // save the state of PINS C0 to C3
         // todo: add debouncing
