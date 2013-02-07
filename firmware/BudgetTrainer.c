@@ -34,18 +34,22 @@ void MotorController(TrainerData *data)
 
     double x_axis, angle_rad, angle_deg;
 
-    //angle_rad = asin(X_AXIS_MAX);                       // Maximum rotational angle in radians
-    //angle_deg = angle_rad * 180 / M_PI;                 // Convert radians to degrees
-    //printf("max x_axis %f\n", X_AXIS_MAX);
-    //printf("max angle_rad %f\n", angle_rad);
-    //printf("max angle_deg %f\n", angle_deg);
+#ifdef DEBUG_OUTPUT
+    angle_rad = asin(X_AXIS_MAX);                       // Maximum rotational angle in radians
+    angle_deg = angle_rad * 180 / M_PI;                 // Convert radians to degrees
+    printf("max x_axis %f\n", X_AXIS_MAX);
+    printf("max angle_rad %f\n", angle_rad);
+    printf("max angle_deg %f\n", angle_deg);
+#endif
 
     target_position = data->target_position;
     current_position = data->current_position;
 
     if ((target_position >= 1) && (target_position <= SERVO_RES))
     {
+#ifdef DEBUG_OUTPUT
         printf("Target position %i\n", target_position);
+#endif
 
         // CHECK MY MATHS :)
         x_axis = (X_AXIS_MAX *
@@ -59,15 +63,19 @@ void MotorController(TrainerData *data)
         OCR1A = SERVO_MIDPOINT - (angle_deg *           // Timing value to get servo rotation to
                 SERVO_DEGREE);                          //   required angle (in given direction)
 
+#ifdef DEBUG_OUTPUT
         printf("Setting x_axis to %f, arm angle to %f, servo pulse to %i\n",
                 x_axis, angle_deg, OCR1A);
+#endif
         current_position = target_position;
         //data->target_position = target_position;
         data->current_position = current_position;
     }
     else
     {
+#ifdef DEBUG_OUTPUT
         printf("Invalid entry, please try again...\n");
+#endif
     }
 }
 
@@ -157,7 +165,9 @@ void ReadData(uint8_t *buf, uint8_t size)
     if ((buf[0] != 0xAA) || (buf[1] != 0x01))
     {
         // if we're here then the packet contains unexpected data, just log for now
+#ifdef DEBUG_OUTPUT
         printf("packet contains unexpected data\n");
+#endif
 
         // todo: handle this situation, possibly means we're out of sync
         //       and receiving part way though a packet? read in the remaining
@@ -255,6 +265,7 @@ ISR( TIMER1_OVF_vect)
     }
 }
 
+#ifdef DEBUG_OUTPUT
 static int uart_putc(char c, FILE *unused)
 {
     while (!(UCSR0A & (1 << UDRE0)));
@@ -263,6 +274,7 @@ static int uart_putc(char c, FILE *unused)
 }
 
 FILE uart_str = FDEV_SETUP_STREAM(uart_putc, NULL, _FDEV_SETUP_WRITE);
+#endif
 
 int main()
 {
@@ -273,7 +285,9 @@ int main()
 
     SetupHardware(&data);
 
+#ifdef DEBUG_OUTPUT
     stdout = &uart_str;                                 // redirect printf and scanf to UART for debug output
+#endif
 
     while (1)
     {
