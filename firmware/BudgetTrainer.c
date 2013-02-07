@@ -26,9 +26,6 @@ volatile uint8_t buttons = 0;
 
 void MotorController(TrainerData *data)
 {
-    // todo: add some rate limiting code to slow large arm movements,
-    //       reducing stress & load on the physical components
-
     uint8_t target_position;
     uint8_t current_position;
 
@@ -51,9 +48,26 @@ void MotorController(TrainerData *data)
         printf("Target position %i\n", target_position);
 #endif
 
+        // basic rate limiting code to slow large arm movements,
+        // reducing stress & load on the physical components
+        if (target_position > current_position)
+        {
+            if (target_position - current_position > 10 )
+                current_position = current_position + 3;
+            else
+                current_position++;
+        }
+        if (target_position < current_position)
+        {
+            if (current_position - target_position > 10 )
+                current_position = current_position - 3;
+            else
+                current_position--;
+        }
+
         // CHECK MY MATHS :)
         x_axis = (X_AXIS_MAX *
-                 (target_position - SERVO_MIDSTEP))     // position should be signed plus/minus around the mid-point,
+                 (current_position - SERVO_MIDSTEP))    // position should be signed plus/minus around the mid-point,
                  / (SERVO_MIDSTEP - 1);                 // divided by the number of steps each side
                                                         // Check also correct for even numbers of steps?
 
@@ -67,8 +81,7 @@ void MotorController(TrainerData *data)
         printf("Setting x_axis to %f, arm angle to %f, servo pulse to %i\n",
                 x_axis, angle_deg, OCR1A);
 #endif
-        current_position = target_position;
-        //data->target_position = target_position;
+
         data->current_position = current_position;
     }
     else
@@ -223,6 +236,9 @@ void CalculatePosition(TrainerData *data)
         // in ergo mode
     }
 
+    // speed override, if lower than 5kph set resistance to minimum
+    if (data->current_speed < 50)
+        data->target_position = 1;
 }
 
 void ProcessControlMessage(uint8_t *buf, TrainerData *data)
