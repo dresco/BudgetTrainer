@@ -66,6 +66,12 @@
 #define USART_BAUDRATE 2400
 #define USART_BAUD_PRESCALE (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
 
+// Buttons
+#define BT_PLUS           0x04
+#define BT_MINUS          0x02
+#define BT_CANCEL         0x08
+#define BT_ENTER          0x01
+
 // Device operation modes
 #define BT_ERGOMODE       0x01
 #define BT_SSMODE         0x02

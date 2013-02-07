@@ -182,7 +182,17 @@ void WriteData(uint8_t *buf, uint8_t size)
 
 void GetButtonStatus(TrainerData *data)
 {
+    static uint8_t last_buttons = 0;
+
+    // in lieu of debounce support, just make sure we don't send
+    // multiple lap button presses in a row, as probably not what
+    // anybody wants
     data->buttons = buttons;
+
+    if (last_buttons & BT_ENTER)
+        data->buttons &= ~BT_ENTER;
+
+    last_buttons = buttons;
     buttons = 0;
 }
 
