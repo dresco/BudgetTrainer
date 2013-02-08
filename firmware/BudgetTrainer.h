@@ -63,7 +63,7 @@
 //#include <avr/sleep.h>
 //#include <util/delay.h>
 
-#define USART_BAUDRATE 2400
+#define USART_BAUDRATE 38400
 #define USART_BAUD_PRESCALE (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
 
 // Buttons

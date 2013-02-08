@@ -196,16 +196,20 @@ void WriteData(uint8_t *buf, uint8_t size)
 void GetButtonStatus(TrainerData *data)
 {
     static uint8_t last_buttons = 0;
+    uint8_t cur_buttons;
+
+    PORTB ^= (1 << 0);                                  // Toggle the debug LED on port B0
 
     // in lieu of debounce support, just make sure we don't send
     // multiple lap button presses in a row, as probably not what
     // anybody wants
-    data->buttons = buttons;
+    cur_buttons = buttons;
+    data->buttons = cur_buttons;
 
     if (last_buttons & BT_ENTER)
         data->buttons &= ~BT_ENTER;
 
-    last_buttons = buttons;
+    last_buttons = cur_buttons;
     buttons = 0;
 }
 
@@ -215,8 +219,6 @@ void CalculatePosition(TrainerData *data)
 
     if (data->mode == BT_SSMODE)
     {
-        PORTB ^= (1 << 0);                                  // Toggle the debug LED on port B0
-
         // in slope mode, perform some mapping between gradient
         // and motor position..
         // Target gradient - (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
