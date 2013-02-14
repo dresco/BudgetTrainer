@@ -63,7 +63,7 @@
 //#include <avr/sleep.h>
 //#include <util/delay.h>
 
-#define USART_BAUDRATE 38400
+#define USART_BAUDRATE 9600
 #define USART_BAUD_PRESCALE (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
 
 // Buttons
@@ -99,8 +99,9 @@ typedef struct TrainerData
 #define SERVO_INTERVAL      10000                       // 20ms (1MHz timer, 10ms up & 10ms down)
 #define SERVO_MIDPOINT      750                         // 1.5ms output pulse (1,500 us) for centre angle
 #define SERVO_MAX_DIFF      300                         // 0.6ms change in output pulse for max angle
-#define SERVO_DEGREE        5.5555                      // 5.555us per degree of rotation (1000/180)
-#define ARM_RADIUS          20.0                        // Effective radius of the servo arm in mm
+#define SERVO_DEGREE        6.25                        // Nominally 5.555us per degree of rotation (1000/180),
+                                                        // but measured at ~6.25us (625us per 100 degrees rotation)
+#define ARM_RADIUS          19.0                        // Effective radius of the servo arm in mm
 #define LINEAR_TRAVEL       30                          // Required linear travel in mm
 #define X_AXIS_MAX          (LINEAR_TRAVEL/ARM_RADIUS)/2// Maximum point on x-axis (unit circle)
 #define SERVO_RES           100.00                      // Target resolution of 100 positions (99 steps between so make it a double)

@@ -104,7 +104,6 @@ void TimerSetup(void)
 {
     TCCR1B |= (1 << WGM13);                             // Configure timer for PWM Mode 8 (phase and frequency correct)
     ICR1 = SERVO_INTERVAL;                              // Set TOP value for the wave form to 20ms
-    //OCR1A = SERVO_MIDPOINT;                             // Set output compare value to 1.5ms pulse (mid point)
     TCCR1A |= ((1 << COM1A1));                          // Clear OC1A on upcount compare and set on downcount compare
     TIMSK1 |= (1 << TOIE1);                             // Interrupt at bottom - TIMER1_OVF_vect
 
@@ -165,7 +164,8 @@ void SetupHardware(TrainerData *data)
     PortSetup();
 
     data->target_position = 1;                          // Set the initial arm position to minimum before we
-    MotorController(data);                              // enable the timer for servo control
+    data->current_position = 1;                         // enable the timer for servo control
+    MotorController(data);                              // Set the OCR1A timer interval to control the servo arm position
 
     TimerSetup();
 
