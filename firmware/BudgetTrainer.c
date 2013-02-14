@@ -24,6 +24,28 @@
 // volatile globals - accessed from interrupt handlers
 volatile uint8_t buttons = 0;
 
+// The source code for this function comes from the zunzun.com online curve fitting
+// site. The input to the curve fitting algorithms was derived from the power curves
+// published at tacx.com.
+//
+// Fitting function: Simple_SimpleEquation_33_model()
+// Fitting target: lowest sum of squared absolute error
+// Fitting target value = 7584.58195696
+double GetResistance(double x_in, double y_in)
+{
+
+    double temp;
+    temp = 0.0;
+
+    // coefficients
+    double a = -1.5551745362491399E+01;
+    double b = -1.4121261534412761E+00;
+    double c = 1.9523034800130676E-01;
+
+    temp = (a+y_in)/(b+c*x_in);
+    return temp;
+}
+
 void MotorController(TrainerData *data)
 {
     uint8_t target_position;
@@ -216,6 +238,7 @@ void GetButtonStatus(TrainerData *data)
 void CalculatePosition(TrainerData *data)
 {
     uint8_t position;
+    double speed, load;
 
     if (data->mode == BT_SSMODE)
     {
@@ -236,6 +259,19 @@ void CalculatePosition(TrainerData *data)
     if (data->mode == BT_ERGOMODE)
     {
         // in ergo mode
+        // testing functions from 3D curve/surface fitting site zunzun.com
+        // to model the resistance level for a given speed and load
+        speed = data->current_speed / 10.0;
+        load = data->target_load / 10.0;
+
+        position = GetResistance(speed, load);
+
+        if (position < 1)
+            position = 1;
+        if (position > SERVO_RES)
+            position = SERVO_RES;
+
+        data->target_position = position;
     }
 
     // speed override, if lower than 5kph set resistance to minimum

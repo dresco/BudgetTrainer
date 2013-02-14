@@ -5,11 +5,11 @@ software:
 
 firmware:
 
- - import servo positioning code from test harness
- - add rate limiting to positioning code (don't stress the motor/cable/trainer)
- - rewrite button code from test harness (h/w interrupt & debounce)
  - initial calibration attempt
  - migrate to USB part
+ - smooth realtime data before motor adjustment, currently a bit twitchy
+ - add timeout to serial comms & support for disconnected (no PC) mode
+ - handle invalid serial data a bit better (sync to start of message?)
  - move hard coded calibration data to EEPROM and configure from PC
 
 hardware:
