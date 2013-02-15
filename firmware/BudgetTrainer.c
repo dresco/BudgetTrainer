@@ -24,6 +24,42 @@
 // volatile globals - accessed from interrupt handlers
 volatile uint8_t buttons = 0;
 
+double GetVirtualPower(double speed, double slope)
+{
+    //
+    // Estimate the power required for a given speed & slope,
+    // equations and constants from analyticcycling.com;
+    //
+    // Wind Resistance     Fw = 1/2 A Cw Rho Vmps2
+    // Rolling Resistance  Frl = Wkg 9.8 Crr
+    // Gravity Forces      Fsl = Wkg 9.8 GradHill
+    // Power        RiderPower = (Fw + Frl + Fsl) Vmps
+    //
+    double A = 0.5;             // Frontal area
+    double Cw = 0.5;            // Drag coefficient
+    double Rho = 1.226;         // Air density
+    double crr = 0.004;         // Coefficient of rolling resistance
+    double g = 9.81;            // Gravity
+    double Wkg = 85;            // 85kg combined rider+bike weight. TODO: move rider weight to config data
+    double Vmps = speed / 3.6;  // Speed in meters per sec
+
+    double power, Fw, Frl, Fsl;
+
+    // calculate wind resistance
+    Fw = 0.5 * A * Cw * Rho * pow(Vmps,2);
+
+    // calculate rolling resistance
+    Frl = Wkg * g * crr;
+
+    // calculate gravity forces
+    Fsl = Wkg * g * slope;
+
+    // calculate required power
+    power = (Fw + Frl + Fsl) * Vmps;
+
+    return (power);
+}
+
 // The source code for this function comes from the zunzun.com online curve fitting
 // site. The input to the curve fitting algorithms was derived from the power curves
 // published at tacx.com.
@@ -238,16 +274,32 @@ void GetButtonStatus(TrainerData *data)
 void CalculatePosition(TrainerData *data)
 {
     uint8_t position;
-    double speed, load;
+    double speed, load, slope;
 
     if (data->mode == BT_SSMODE)
     {
-        // in slope mode, perform some mapping between gradient
-        // and motor position..
-        // Target gradient - (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
+        // in slope mode
 
         // for initial testing, just linear mapping between slope and position
-        position = data->target_gradient / 2.5;
+        // position = data->target_gradient / 2.5;
+
+        // Convert gradient representation (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
+        // into a fractional slope (i.e. -5% = -0.05, 0% = 0.0, 10% = 0.1)
+        slope = (((data->target_gradient / 10.0) - 10) / 100);
+
+        // Convert speed into kph
+        speed = data->current_speed / 10.0;
+
+        // Estimate the required power to achieve current speed & slope
+        load = GetVirtualPower(speed, slope);
+
+        // watch out for those downhills! ;)
+        // the current resistance model appears to break down at low wattage
+        if (load < 50)
+            load = 50;
+
+        // Estimate the required resistance level for current speed and estimated power
+        position = GetResistance(speed, load);
 
         if (position < 1)
             position = 1;

@@ -5,7 +5,7 @@ software:
 
 firmware:
 
- - initial calibration attempt
+ - Refine calibration and resistance calculation
  - migrate to USB part
  - smooth realtime data before motor adjustment, currently a bit twitchy
  - add timeout to serial comms & support for disconnected (no PC) mode
