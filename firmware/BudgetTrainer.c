@@ -275,6 +275,8 @@ void CalculatePosition(TrainerData *data)
 {
     uint8_t position;
     double speed, load, slope;
+    double avg_speed;
+    static double total_speed;
 
     if (data->mode == BT_SSMODE)
     {
@@ -287,11 +289,16 @@ void CalculatePosition(TrainerData *data)
         // into a fractional slope (i.e. -5% = -0.05, 0% = 0.0, 10% = 0.1)
         slope = (((data->target_gradient / 10.0) - 10) / 100);
 
-        // Convert speed into kph
+        // Convert realtime speed into kph
         speed = data->current_speed / 10.0;
 
+        // Track average values for the realtime speed
+        total_speed -= total_speed / 10;      // keep 9/10
+        total_speed += speed;                 // and add in 1/10 from the new sample
+        avg_speed = total_speed / 10;         // and use composite rolling average
+
         // Estimate the required power to achieve current speed & slope
-        load = GetVirtualPower(speed, slope);
+        load = GetVirtualPower(avg_speed, slope);
 
         // watch out for those downhills! ;)
         // the current resistance model appears to break down at low wattage
@@ -299,7 +306,7 @@ void CalculatePosition(TrainerData *data)
             load = 50;
 
         // Estimate the required resistance level for current speed and estimated power
-        position = GetResistance(speed, load);
+        position = GetResistance(avg_speed, load);
 
         if (position < 1)
             position = 1;
@@ -313,10 +320,19 @@ void CalculatePosition(TrainerData *data)
         // in ergo mode
         // testing functions from 3D curve/surface fitting site zunzun.com
         // to model the resistance level for a given speed and load
+
+        // Convert realtime speed into kph
         speed = data->current_speed / 10.0;
+
+        // Track average values for the realtime speed
+        total_speed -= total_speed / 10;      // keep 9/10
+        total_speed += speed;                 // and add in 1/10 from the new sample
+        avg_speed = total_speed / 10;         // and use composite rolling average
+
+        // convert load into watts
         load = data->target_load / 10.0;
 
-        position = GetResistance(speed, load);
+        position = GetResistance(avg_speed, load);
 
         if (position < 1)
             position = 1;
@@ -327,7 +343,7 @@ void CalculatePosition(TrainerData *data)
     }
 
     // speed override, if lower than 5kph set resistance to minimum
-    if (data->current_speed < 50)
+    if (avg_speed < 5)
         data->target_position = 1;
 }
 
