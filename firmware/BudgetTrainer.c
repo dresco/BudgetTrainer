@@ -152,10 +152,10 @@ void MotorController(TrainerData *data)
 
 void USART_Setup(void)
 {
-    UCSR0B |= (1 << TXEN0) | (1 << RXEN0);              // Turn on the transmit / receive circuitry
+    UCSR1B |= (1 << TXEN1) | (1 << RXEN1);              // Turn on the transmit / receive circuitry
 
-    UBRR0L = USART_BAUD_PRESCALE;                       // Load lower 8-bits of the baud rate register
-    UBRR0H = (USART_BAUD_PRESCALE >> 8);                // Load upper 8-bits of the baud rate register
+    UBRR1L = USART_BAUD_PRESCALE;                       // Load lower 8-bits of the baud rate register
+    UBRR1H = (USART_BAUD_PRESCALE >> 8);                // Load upper 8-bits of the baud rate register
 }
 
 void TimerSetup(void)
@@ -181,14 +181,14 @@ void PortSetup()
 
 uint8_t USART_GetChar(void)
 {
-    while (!(UCSR0A & (1 << RXC0)));
-    return UDR0;
+    while (!(UCSR1A & (1 << RXC1)));
+    return UDR1;
 }
 
 void USART_SendChar(char ByteToSend)
 {
-    while ((UCSR0A & (1 << UDRE0)) == 0);               // Wait until UDR is ready for more data
-    UDR0 = ByteToSend;                                  // Write the current byte
+    while ((UCSR1A & (1 << UDRE1)) == 0);               // Wait until UDR is ready for more data
+    UDR1 = ByteToSend;                                  // Write the current byte
 }
 
 void USART_SendBuffer(uint8_t* BuffToSend, uint8_t BuffSize)
@@ -201,7 +201,7 @@ void USART_SendBuffer(uint8_t* BuffToSend, uint8_t BuffSize)
     }
 
     // wait for transmit to complete before returning.
-    while (!(UCSR0A & (1 << TXC0)));
+    while (!(UCSR1A & (1 << TXC1)));
 }
 
 void USART_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
