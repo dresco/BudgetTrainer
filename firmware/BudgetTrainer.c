@@ -170,7 +170,7 @@ void TimerSetup(void)
 
 void PortSetup()
 {
-    DDRB |= (1 << 0);                                   // Set port B0 as output for debug LED
+    DDRE |= (1 << 6);                                   // Set port E6 as output for debug LED
     DDRB |= (1 << PB1);                                 // Enable output on PINB1 (OC1A)
 
     PORTC |= (1 << 0);                                  // Enable pullup resistor on port C0 (Enter)
@@ -256,7 +256,7 @@ void GetButtonStatus(TrainerData *data)
     static uint8_t last_buttons = 0;
     uint8_t cur_buttons;
 
-    PORTB ^= (1 << 0);                                  // Toggle the debug LED on port B0
+    PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
 
     // in lieu of debounce support, just make sure we don't send
     // multiple lap button presses in a row, as probably not what
@@ -392,7 +392,7 @@ ISR( TIMER1_OVF_vect)
     if (++count == 5)
     {
         count = 0;
-//        PORTB ^= (1 << 0);                                  // Toggle the debug LED on port B0
+//        PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
 
         // save the state of PINS C0 to C3
         // todo: add debouncing
