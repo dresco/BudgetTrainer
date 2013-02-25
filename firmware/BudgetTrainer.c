@@ -20,9 +20,37 @@
 // THE SOFTWARE.
 
 #include "BudgetTrainer.h"
+#include "lookup.h"
 
 // volatile globals - accessed from interrupt handlers
 volatile uint8_t buttons = 0;
+
+double LookupResistance(double x_in, double y_in)
+{
+    uint8_t i, col, row;
+    double temp;
+
+    // calculate the last row/col that we are greater than or equal to
+    // using the provided x (speed) and y (power) values
+    col = 0;
+    for (i = 0; i < SPEED_COLS; i++)
+    {
+        if (x_in >= speed_index[i])
+            col = i;
+    }
+
+    row = 0;
+    for (i = 1; i <= POWER_ROWS; i++)
+    {
+        if (y_in >= power_index[i])
+            row = i;
+    }
+
+    // index into the lookup table at the calculated row & column
+    // todo: add bilinear interpolation
+    temp = lookup_table_1d[((SPEED_COLS*row) + col)];
+    return temp;
+}
 
 double GetVirtualPower(double speed, double slope)
 {
@@ -306,7 +334,7 @@ void CalculatePosition(TrainerData *data)
             load = 50;
 
         // Estimate the required resistance level for current speed and estimated power
-        position = GetResistance(avg_speed, load);
+        position = LookupResistance(avg_speed, load);
 
         if (position < 1)
             position = 1;
