@@ -20,6 +20,7 @@
 // THE SOFTWARE.
 
 #include "BudgetTrainer.h"
+#include "usb_serial.h"
 
 // volatile globals - accessed from interrupt handlers
 volatile uint8_t buttons = 0;
@@ -191,26 +192,29 @@ void USART_SendChar(char ByteToSend)
     UDR1 = ByteToSend;                                  // Write the current byte
 }
 
-void USART_SendBuffer(uint8_t* BuffToSend, uint8_t BuffSize)
+void USB_SendBuffer(uint8_t* BuffToSend, uint8_t BuffSize)
 {
     uint8_t i;
 
     for (i = 0; i < BuffSize; i++)
     {
-        USART_SendChar(BuffToSend[i]);
+        usb_serial_putchar(BuffToSend[i]);
     }
 
     // wait for transmit to complete before returning.
-    while (!(UCSR1A & (1 << TXC1)));
 }
 
-void USART_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
+void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
 {
-    uint8_t i;
+    uint8_t i, c;
 
     for (i = 0; i < BuffSize; i++)
     {
-        BuffToRead[i] = USART_GetChar();
+        do {
+            c = usb_serial_getchar();
+        } while (c == -1);
+
+        BuffToRead[i] = c;
     }
 }
 
@@ -232,7 +236,7 @@ void SetupHardware(TrainerData *data)
 
 void ReadData(uint8_t *buf, uint8_t size)
 {
-    USART_ReadBuffer(buf, size);
+    USB_ReadBuffer(buf, size);
     if ((buf[0] != 0xAA) || (buf[1] != 0x01))
     {
         // if we're here then the packet contains unexpected data, just log for now
@@ -248,7 +252,7 @@ void ReadData(uint8_t *buf, uint8_t size)
 
 void WriteData(uint8_t *buf, uint8_t size)
 {
-    USART_SendBuffer(buf, size);
+    USB_SendBuffer(buf, size);
 }
 
 void GetButtonStatus(TrainerData *data)
