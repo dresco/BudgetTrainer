@@ -96,6 +96,15 @@ typedef struct TrainerData
     uint16_t current_power;
 } TrainerData;
 
+typedef struct TableEntry
+{
+    uint8_t row;
+    uint8_t col;
+    uint8_t speed;
+    uint16_t power;
+    uint8_t value;
+} TableEntry;
+
 #define SERVO_INTERVAL      10000                       // 20ms (1MHz timer, 10ms up & 10ms down)
 #define SERVO_MIDPOINT      750                         // 1.5ms output pulse (1,500 us) for centre angle
 #define SERVO_MAX_DIFF      300                         // 0.6ms change in output pulse for max angle

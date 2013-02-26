@@ -1,6 +1,9 @@
 #define SPEED_COLS 12
 #define POWER_ROWS 12
 
+#define max(a,b)    (((a) > (b)) ? (a) : (b))
+#define min(a,b)    (((a) < (b)) ? (a) : (b))
+
 uint16_t power_index[POWER_ROWS] = {25,50,75,100,150,200,250,300,350,400,450,500};
 
 uint16_t speed_index[SPEED_COLS] = {5,10,15,20,25,30,35,40,45,50,55,60};

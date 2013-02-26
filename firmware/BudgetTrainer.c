@@ -25,12 +25,50 @@
 // volatile globals - accessed from interrupt handlers
 volatile uint8_t buttons = 0;
 
+uint8_t Interpolate(TableEntry *t0, TableEntry *t1, TableEntry *t2, TableEntry *t3, TableEntry *t4)
+{
+    uint8_t i = 0;
+    double x, x1, x2, y, y1, y2;
+    double q11, q12, q21, q22;
+
+    // bilinear interpolation
+    //
+    //      x1     x     x2
+    //       |     |      |
+    // y1--t1/q11-------t2/q21--
+    //       |     |      |
+    // y  ---|----t0------|----
+    //       |     |      |
+    // y2--t3/q12-------t4/q22--
+    //       |     |      |
+    //
+
+    x   = t0->speed;
+    x1  = t1->speed;
+    x2  = t2->speed;
+    y   = t0->power;
+    y1  = t1->power;
+    y2  = t3->power;
+    q11 = t1->value;
+    q12 = t3->value;
+    q21 = t2->value;
+    q22 = t4->value;
+
+    i = ((((x2-x)*(y2-y)) / ((x2-x1)*(y2-y1))) * q11) +
+        ((((x-x1)*(y2-y)) / ((x2-x1)*(y2-y1))) * q21) +
+        ((((x2-x)*(y-y1)) / ((x2-x1)*(y2-y1))) * q12) +
+        ((((x-x1)*(y-y1)) / ((x2-x1)*(y2-y1))) * q22);
+
+    return i;
+}
+
 double LookupResistance(double x_in, double y_in)
 {
     uint8_t i, col, row;
     double temp;
+    TableEntry t0, t1, t2, t3, t4;
 
-    // calculate the last row/col that we are greater than or equal to
+    // find the last row/col that we are greater than or equal to
     // using the provided x (speed) and y (power) values
     col = 0;
     for (i = 0; i < SPEED_COLS; i++)
@@ -40,15 +78,70 @@ double LookupResistance(double x_in, double y_in)
     }
 
     row = 0;
-    for (i = 1; i <= POWER_ROWS; i++)
+    for (i = 0; i < POWER_ROWS; i++)
     {
         if (y_in >= power_index[i])
             row = i;
     }
 
     // index into the lookup table at the calculated row & column
-    // todo: add bilinear interpolation
-    temp = lookup_table_1d[((SPEED_COLS*row) + col)];
+    // temp = lookup_table_1d[((SPEED_COLS*row) + col)];
+
+    // find the four surrounding data points in the table
+    if (row < POWER_ROWS-1)
+    {
+        t1.power = t2.power = power_index[row];
+        t3.power = t4.power = power_index[row+1];
+        t1.row = t2.row = row;
+        t3.row = t4.row = row+1;
+    }
+    else
+    {
+        t1.power = t2.power = power_index[row-1];
+        t3.power = t4.power = power_index[row];
+        t1.row = t2.row = row-1;
+        t3.row = t4.row = row;
+    }
+
+    if (col < SPEED_COLS-1)
+    {
+        t1.speed = t3.speed = speed_index[col];
+        t2.speed = t4.speed = speed_index[col+1];
+        t1.col = t3.col = col;
+        t2.col = t4.col = col+1;
+    }
+    else
+    {
+        t1.speed = t3.speed = speed_index[col-1];
+        t2.speed = t4.speed = speed_index[col];
+        t1.col = t3.col = col-1;
+        t2.col = t4.col = col;
+    }
+
+    t0.speed = x_in;
+    t0.power = y_in;
+
+    // ensure speed and power are not outside bounding box
+    if (t0.speed < min(t1.speed,t2.speed))
+        t0.speed = min(t1.speed,t2.speed);
+
+    if (t0.speed > max(t1.speed,t2.speed))
+        t0.speed = max(t1.speed,t2.speed);
+
+    if (t0.power < min(t1.power,t3.power))
+        t0.power = min(t1.power,t3.power);
+
+    if (t0.power > max(t1.power,t3.power))
+        t0.power = max(t1.power,t3.power);
+
+    // lookup the resistance values for each surrounding point
+    t1.value = lookup_table_1d[((SPEED_COLS*t1.row) + t1.col)];
+    t2.value = lookup_table_1d[((SPEED_COLS*t2.row) + t2.col)];
+    t3.value = lookup_table_1d[((SPEED_COLS*t3.row) + t3.col)];
+    t4.value = lookup_table_1d[((SPEED_COLS*t4.row) + t4.col)];
+
+    // calculate the interpolated resistance value between these points..
+    temp = Interpolate(&t0, &t1, &t2, &t3, &t4);
 
     // ensure values will fall within our expected 1 - 100 range
     if (temp < 51)
@@ -59,6 +152,7 @@ double LookupResistance(double x_in, double y_in)
 
     return temp;
 }
+
 
 double GetVirtualPower(double speed, double slope)
 {
