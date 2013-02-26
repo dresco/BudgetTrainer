@@ -48,7 +48,15 @@ double LookupResistance(double x_in, double y_in)
 
     // index into the lookup table at the calculated row & column
     // todo: add bilinear interpolation
-    temp = lookup_table_1d[((SPEED_COLS*row) + col)] - 50;
+    temp = lookup_table_1d[((SPEED_COLS*row) + col)];
+
+    // ensure values will fall within our expected 1 - 100 range
+    if (temp < 51)
+        temp = 51;
+    if (temp > 150)
+        temp = 150;
+    temp = temp - 50;
+
     return temp;
 }
 
