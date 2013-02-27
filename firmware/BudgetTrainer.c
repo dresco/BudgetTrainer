@@ -206,7 +206,8 @@ void USB_SendBuffer(uint8_t* BuffToSend, uint8_t BuffSize)
 
 void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
 {
-    uint8_t i, c;
+    uint8_t i;
+    int16_t c;
 
     for (i = 0; i < BuffSize; i++)
     {
@@ -221,6 +222,8 @@ void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
 void SetupHardware(TrainerData *data)
 {
     clock_prescale_set(clock_div_1);                    // Disable clock prescaler (for 8MHz operation)
+
+    usb_init();
 
     USART_Setup();
     PortSetup();
