@@ -174,10 +174,10 @@ void PortSetup()
     DDRE |= (1 << 6);                                   // Set port E6 as output for debug LED
     DDRB |= (1 << PB1);                                 // Enable output on PINB1 (OC1A)
 
-    PORTC |= (1 << 0);                                  // Enable pullup resistor on port C0 (Enter)
-    PORTC |= (1 << 1);                                  // Enable pullup resistor on port C1 (Minus)
-    PORTC |= (1 << 2);                                  // Enable pullup resistor on port C2 (Plus)
-    PORTC |= (1 << 3);                                  // Enable pullup resistor on port C3 (Cancel)
+    PORTF |= (1 << 4);                                  // Enable pullup resistor on port F4 (Enter)
+    PORTF |= (1 << 5);                                  // Enable pullup resistor on port F5 (Minus)
+    PORTF |= (1 << 6);                                  // Enable pullup resistor on port F6 (Plus)
+    PORTF |= (1 << 7);                                  // Enable pullup resistor on port F7 (Cancel)
 }
 
 uint8_t USART_GetChar(void)
@@ -401,17 +401,17 @@ ISR( TIMER1_OVF_vect)
         count = 0;
 //        PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
 
-        // save the state of PINS C0 to C3
+        // save the state of PINS F4 to F7
         // todo: add debouncing
         //
-        // C0 - Enter
-        // C1 - Minus
-        // C2 - Plus
-        // C3 - Cancel
+        // F4 - Enter
+        // F5 - Minus
+        // F6 - Plus
+        // F7 - Cancel
         //
-        for (i=0 ; i<4 ; i++)
+        for (i=4 ; i<8 ; i++)
         {
-            if (!(PINC & (1<<i)))
+            if (!(PINF & (1<<i)))
                 buttons |= (1<<i);
         }
     }
