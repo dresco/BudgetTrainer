@@ -98,9 +98,9 @@ typedef struct TrainerData
     uint16_t current_power;
 } TrainerData;
 
-#define SERVO_INTERVAL      10000                       // 20ms (1MHz timer, 10ms up & 10ms down)
-#define SERVO_MIDPOINT      750                         // 1.5ms output pulse (1,500 us) for centre angle
-#define SERVO_MAX_DIFF      300                         // 0.6ms change in output pulse for max angle
+#define SERVO_INTERVAL      20000                       // 20ms (2MHz timer, 10ms up & 10ms down)
+#define SERVO_MIDPOINT      1500                        // 1.5ms output pulse (1,500 us) for centre angle
+#define SERVO_MAX_DIFF      600                         // 0.6ms change in output pulse for max angle
 #define SERVO_DEGREE        6.25                        // Nominally 5.555us per degree of rotation (1000/180),
                                                         // but measured at ~6.25us (625us per 100 degrees rotation)
 #define ARM_RADIUS          19.0                        // Effective radius of the servo arm in mm

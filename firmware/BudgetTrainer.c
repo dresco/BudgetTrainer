@@ -134,7 +134,7 @@ void MotorController(TrainerData *data)
         angle_deg = angle_rad * 180 / M_PI;             // Convert radians to degrees
 
         OCR1A = SERVO_MIDPOINT - (angle_deg *           // Timing value to get servo rotation to
-                SERVO_DEGREE);                          //   required angle (in given direction)
+                SERVO_DEGREE*2);                        //   required angle (in given direction)
 
 #ifdef DEBUG_OUTPUT
         printf("Setting x_axis to %f, arm angle to %f, servo pulse to %i\n",
@@ -166,13 +166,13 @@ void TimerSetup(void)
     TCCR1A |= ((1 << COM1A1));                          // Clear OC1A on upcount compare and set on downcount compare
     TIMSK1 |= (1 << TOIE1);                             // Interrupt at bottom - TIMER1_OVF_vect
 
-    TCCR1B |= (1 << CS11);                              // Start timer with prescaler of 8 = 1MHz timer
+    TCCR1B |= (1 << CS11);                              // Start timer with prescaler of 8 = 2MHz timer
 }
 
 void PortSetup()
 {
     DDRE |= (1 << 6);                                   // Set port E6 as output for debug LED
-    DDRB |= (1 << PB1);                                 // Enable output on PINB1 (OC1A)
+    DDRB |= (1 << PB5);                                 // Enable output on PINB5 (OC1A)
 
     PORTF |= (1 << 4);                                  // Enable pullup resistor on port F4 (Enter)
     PORTF |= (1 << 5);                                  // Enable pullup resistor on port F5 (Minus)
