@@ -28,18 +28,17 @@ volatile uint8_t buttons = 0;
 uint8_t Interpolate(TableEntry *t0, TableEntry *t1, TableEntry *t2, TableEntry *t3, TableEntry *t4)
 {
     uint8_t i = 0;
-    double x, x1, x2, y, y1, y2;
-    double q11, q12, q21, q22;
+    double x, x1, x2, y, y1, y2, z11, z12, z21, z22;
 
     // bilinear interpolation
     //
     //      x1     x     x2
     //       |     |      |
-    // y1--t1/q11-------t2/q21--
+    // y1--t1/z11-------t2/z21--
     //       |     |      |
     // y  ---|----t0------|----
     //       |     |      |
-    // y2--t3/q12-------t4/q22--
+    // y2--t3/z12-------t4/z22--
     //       |     |      |
     //
 
@@ -49,23 +48,23 @@ uint8_t Interpolate(TableEntry *t0, TableEntry *t1, TableEntry *t2, TableEntry *
     y   = t0->power;
     y1  = t1->power;
     y2  = t3->power;
-    q11 = t1->value;
-    q12 = t3->value;
-    q21 = t2->value;
-    q22 = t4->value;
+    z11 = t1->res;
+    z12 = t3->res;
+    z21 = t2->res;
+    z22 = t4->res;
 
-    i = ((((x2-x)*(y2-y)) / ((x2-x1)*(y2-y1))) * q11) +
-        ((((x-x1)*(y2-y)) / ((x2-x1)*(y2-y1))) * q21) +
-        ((((x2-x)*(y-y1)) / ((x2-x1)*(y2-y1))) * q12) +
-        ((((x-x1)*(y-y1)) / ((x2-x1)*(y2-y1))) * q22);
+    i = ((((x2-x)*(y2-y)) / ((x2-x1)*(y2-y1))) * z11) +
+        ((((x-x1)*(y2-y)) / ((x2-x1)*(y2-y1))) * z21) +
+        ((((x2-x)*(y-y1)) / ((x2-x1)*(y2-y1))) * z12) +
+        ((((x-x1)*(y-y1)) / ((x2-x1)*(y2-y1))) * z22);
 
     return i;
 }
 
-double LookupResistance(double x_in, double y_in)
+double LookupResistance(double x_speed, double y_power)
 {
     uint8_t i, col, row;
-    double temp;
+    double resistance;
     TableEntry t0, t1, t2, t3, t4;
 
     // find the last row/col that we are greater than or equal to
@@ -73,21 +72,18 @@ double LookupResistance(double x_in, double y_in)
     col = 0;
     for (i = 0; i < SPEED_COLS; i++)
     {
-        if (x_in >= speed_index[i])
+        if (x_speed >= speed_index[i])
             col = i;
     }
 
     row = 0;
     for (i = 0; i < POWER_ROWS; i++)
     {
-        if (y_in >= power_index[i])
+        if (y_power >= power_index[i])
             row = i;
     }
 
-    // index into the lookup table at the calculated row & column
-    // temp = lookup_table_1d[((SPEED_COLS*row) + col)];
-
-    // find the four surrounding data points in the table
+    // find the four surrounding data points in the table (t1 - t4)
     if (row < POWER_ROWS-1)
     {
         t1.power = t2.power = power_index[row];
@@ -118,10 +114,12 @@ double LookupResistance(double x_in, double y_in)
         t2.col = t4.col = col;
     }
 
-    t0.speed = x_in;
-    t0.power = y_in;
+    // set the current speed and power point (t0)
+    t0.speed = x_speed;
+    t0.power = y_power;
 
-    // ensure speed and power are not outside bounding box
+    // ensure current speed and power values are not outside of the
+    // surrounding data points, this should only be possible at edge of table
     if (t0.speed < min(t1.speed,t2.speed))
         t0.speed = min(t1.speed,t2.speed);
 
@@ -135,24 +133,23 @@ double LookupResistance(double x_in, double y_in)
         t0.power = max(t1.power,t3.power);
 
     // lookup the resistance values for each surrounding point
-    t1.value = lookup_table_1d[((SPEED_COLS*t1.row) + t1.col)];
-    t2.value = lookup_table_1d[((SPEED_COLS*t2.row) + t2.col)];
-    t3.value = lookup_table_1d[((SPEED_COLS*t3.row) + t3.col)];
-    t4.value = lookup_table_1d[((SPEED_COLS*t4.row) + t4.col)];
+    t1.res = lookup_table_1d[((SPEED_COLS*t1.row) + t1.col)];
+    t2.res = lookup_table_1d[((SPEED_COLS*t2.row) + t2.col)];
+    t3.res = lookup_table_1d[((SPEED_COLS*t3.row) + t3.col)];
+    t4.res = lookup_table_1d[((SPEED_COLS*t4.row) + t4.col)];
 
-    // calculate the interpolated resistance value between these points..
-    temp = Interpolate(&t0, &t1, &t2, &t3, &t4);
+    // get the interpolated resistance value based on these points..
+    resistance = Interpolate(&t0, &t1, &t2, &t3, &t4);
 
-    // ensure values will fall within our expected 1 - 100 range
-    if (temp < 51)
-        temp = 51;
-    if (temp > 150)
-        temp = 150;
-    temp = temp - 50;
+    // ensure final resistance value falls within our expected 1 - 100 range
+    if (resistance < 51)
+        resistance = 51;
+    if (resistance > 150)
+        resistance = 150;
+    resistance = resistance - 50;
 
-    return temp;
+    return resistance;
 }
-
 
 double GetVirtualPower(double speed, double slope)
 {

@@ -100,9 +100,9 @@ typedef struct TableEntry
 {
     uint8_t row;
     uint8_t col;
-    uint8_t speed;
-    uint16_t power;
-    uint8_t value;
+    uint8_t res;
+    double speed;
+    double power;
 } TableEntry;
 
 #define SERVO_INTERVAL      10000                       // 20ms (1MHz timer, 10ms up & 10ms down)
