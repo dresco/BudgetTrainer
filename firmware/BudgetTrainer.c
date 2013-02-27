@@ -420,8 +420,8 @@ ISR( TIMER1_OVF_vect)
 #ifdef DEBUG_OUTPUT
 static int uart_putc(char c, FILE *unused)
 {
-    while (!(UCSR0A & (1 << UDRE0)));
-    UDR0 = c;
+    while (!(UCSR1A & (1 << UDRE1)));
+    UDR1 = c;
     return 0;
 }
 

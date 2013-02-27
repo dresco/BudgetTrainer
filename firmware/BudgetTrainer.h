@@ -63,6 +63,8 @@
 //#include <avr/sleep.h>
 //#include <util/delay.h>
 
+#define DEBUG_OUTPUT
+
 #define USART_BAUDRATE 9600
 #define USART_BAUD_PRESCALE (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
 
