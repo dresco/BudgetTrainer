@@ -444,7 +444,7 @@ void CalculatePosition(TrainerData *data)
         if (load < 50)
             load = 50;
 
-        // Estimate the required resistance level for current speed and estimated power
+        // Look up the required resistance level for current speed and estimated power
         position = LookupResistance(avg_speed, load);
 
         if (position < 1)
@@ -457,8 +457,6 @@ void CalculatePosition(TrainerData *data)
     if (data->mode == BT_ERGOMODE)
     {
         // in ergo mode
-        // testing functions from 3D curve/surface fitting site zunzun.com
-        // to model the resistance level for a given speed and load
 
         // Convert realtime speed into kph
         speed = data->current_speed / 10.0;
@@ -471,6 +469,7 @@ void CalculatePosition(TrainerData *data)
         // convert load into watts
         load = data->target_load / 10.0;
 
+        // Look up the required resistance level for current speed and estimated power
         position = LookupResistance(avg_speed, load);
 
         if (position < 1)
