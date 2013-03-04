@@ -402,16 +402,28 @@ void CalculatePosition(TrainerData *data)
 {
     uint8_t position;
     double speed, load, slope;
-    double avg_speed;
+    double avg_speed = 0;
     static double total_speed;
+
+    if (data->mode == BT_CALIBRATE)
+    {
+        // in calibration mode
+        // for initial testing, just linear mapping between slope and position
+        // todo: assumes gradient data is populated, need to confirm in GC
+        avg_speed = data->current_speed / 10.0;
+        position = data->target_gradient / 2.5;
+
+        if (position < 1)
+            position = 1;
+        if (position > SERVO_RES)
+            position = SERVO_RES;
+
+        data->target_position = position;
+    }
 
     if (data->mode == BT_SSMODE)
     {
         // in slope mode
-
-        // for initial testing, just linear mapping between slope and position
-        // position = data->target_gradient / 2.5;
-
         // Convert gradient representation (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
         // into a fractional slope (i.e. -5% = -0.05, 0% = 0.0, 10% = 0.1)
         slope = (((data->target_gradient / 10.0) - 10) / 100);
@@ -459,7 +471,7 @@ void CalculatePosition(TrainerData *data)
         // convert load into watts
         load = data->target_load / 10.0;
 
-        position = GetResistance(avg_speed, load);
+        position = LookupResistance(avg_speed, load);
 
         if (position < 1)
             position = 1;
