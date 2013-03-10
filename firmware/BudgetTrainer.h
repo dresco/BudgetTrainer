@@ -115,3 +115,5 @@ typedef struct TableEntry
 #define X_AXIS_MAX          (LINEAR_TRAVEL/ARM_RADIUS)/2// Maximum point on x-axis (unit circle)
 #define SERVO_RES           100.00                      // Target resolution of 100 positions (99 steps between so make it a double)
 #define SERVO_MIDSTEP       (SERVO_RES+1)/2             // Assuming starting at 1, there are 99 steps, mid-way is 50.5
+
+#define SPEED_SAMPLES       10                          // How many speed samples to average

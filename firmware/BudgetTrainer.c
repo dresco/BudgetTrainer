@@ -405,6 +405,20 @@ void CalculatePosition(TrainerData *data)
     double avg_speed = 0;
     static double total_speed;
 
+#if 1
+static int total_speed_init;
+
+    // correctly initialise total_speed on first pass.
+    // do we really want to do this? will ramp up from 0 over
+    // a couple of seconds without - which may be preferable,
+    // and what about the start of subsequent erg files?
+    if (total_speed_init == 0)
+    {
+        total_speed = data->current_speed / 10.0 * SPEED_SAMPLES;
+        total_speed_init = 1;
+    }
+#endif
+
     if (data->mode == BT_CALIBRATE)
     {
         // in calibration mode
@@ -432,9 +446,9 @@ void CalculatePosition(TrainerData *data)
         speed = data->current_speed / 10.0;
 
         // Track average values for the realtime speed
-        total_speed -= total_speed / 10;      // keep 9/10
-        total_speed += speed;                 // and add in 1/10 from the new sample
-        avg_speed = total_speed / 10;         // and use composite rolling average
+        total_speed -= total_speed / SPEED_SAMPLES;     // keep 9/10
+        total_speed += speed;                           // and add in 1/10 from the new sample
+        avg_speed = total_speed / SPEED_SAMPLES;        // and use composite rolling average
 
         // Estimate the required power to achieve current speed & slope
         load = GetVirtualPower(avg_speed, slope);
@@ -462,9 +476,9 @@ void CalculatePosition(TrainerData *data)
         speed = data->current_speed / 10.0;
 
         // Track average values for the realtime speed
-        total_speed -= total_speed / 10;      // keep 9/10
-        total_speed += speed;                 // and add in 1/10 from the new sample
-        avg_speed = total_speed / 10;         // and use composite rolling average
+        total_speed -= total_speed / SPEED_SAMPLES;     // keep 9/10
+        total_speed += speed;                           // and add in 1/10 from the new sample
+        avg_speed = total_speed / SPEED_SAMPLES;        // and use composite rolling average
 
         // convert load into watts
         load = data->target_load / 10.0;
