@@ -98,6 +98,15 @@ typedef struct TrainerData
     uint16_t current_power;
 } TrainerData;
 
+typedef struct TableEntry
+{
+    uint8_t row;
+    uint8_t col;
+    uint8_t res;
+    double speed;
+    double power;
+} TableEntry;
+
 #define SERVO_INTERVAL      20000                       // 20ms (2MHz timer, 10ms up & 10ms down)
 #define SERVO_MIDPOINT      1500                        // 1.5ms output pulse (1,500 us) for centre angle
 #define SERVO_MAX_DIFF      600                         // 0.6ms change in output pulse for max angle
@@ -108,3 +117,5 @@ typedef struct TrainerData
 #define X_AXIS_MAX          (LINEAR_TRAVEL/ARM_RADIUS)/2// Maximum point on x-axis (unit circle)
 #define SERVO_RES           100.00                      // Target resolution of 100 positions (99 steps between so make it a double)
 #define SERVO_MIDSTEP       (SERVO_RES+1)/2             // Assuming starting at 1, there are 99 steps, mid-way is 50.5
+
+#define SPEED_SAMPLES       10                          // How many speed samples to average

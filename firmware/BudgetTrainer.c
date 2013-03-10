@@ -21,9 +21,136 @@
 
 #include "BudgetTrainer.h"
 #include "usb_serial.h"
+#include "lookup.h"
 
 // volatile globals - accessed from interrupt handlers
 volatile uint8_t buttons = 0;
+
+uint8_t Interpolate(TableEntry *t0, TableEntry *t1, TableEntry *t2, TableEntry *t3, TableEntry *t4)
+{
+    uint8_t i = 0;
+    double x, x1, x2, y, y1, y2, z11, z12, z21, z22;
+
+    // bilinear interpolation
+    //
+    //      x1     x     x2
+    //       |     |      |
+    // y1--t1/z11-------t2/z21--
+    //       |     |      |
+    // y  ---|----t0------|----
+    //       |     |      |
+    // y2--t3/z12-------t4/z22--
+    //       |     |      |
+    //
+
+    x   = t0->speed;
+    x1  = t1->speed;
+    x2  = t2->speed;
+    y   = t0->power;
+    y1  = t1->power;
+    y2  = t3->power;
+    z11 = t1->res;
+    z12 = t3->res;
+    z21 = t2->res;
+    z22 = t4->res;
+
+    i = ((((x2-x)*(y2-y)) / ((x2-x1)*(y2-y1))) * z11) +
+        ((((x-x1)*(y2-y)) / ((x2-x1)*(y2-y1))) * z21) +
+        ((((x2-x)*(y-y1)) / ((x2-x1)*(y2-y1))) * z12) +
+        ((((x-x1)*(y-y1)) / ((x2-x1)*(y2-y1))) * z22);
+
+    return i;
+}
+
+double LookupResistance(double x_speed, double y_power)
+{
+    uint8_t i, col, row;
+    double resistance;
+    TableEntry t0, t1, t2, t3, t4;
+
+    // find the last row/col that we are greater than or equal to
+    // using the provided x (speed) and y (power) values
+    col = 0;
+    for (i = 0; i < SPEED_COLS; i++)
+    {
+        if (x_speed >= speed_index[i])
+            col = i;
+    }
+
+    row = 0;
+    for (i = 0; i < POWER_ROWS; i++)
+    {
+        if (y_power >= power_index[i])
+            row = i;
+    }
+
+    // find the four surrounding data points in the table (t1 - t4)
+    if (row < POWER_ROWS-1)
+    {
+        t1.power = t2.power = power_index[row];
+        t3.power = t4.power = power_index[row+1];
+        t1.row = t2.row = row;
+        t3.row = t4.row = row+1;
+    }
+    else
+    {
+        t1.power = t2.power = power_index[row-1];
+        t3.power = t4.power = power_index[row];
+        t1.row = t2.row = row-1;
+        t3.row = t4.row = row;
+    }
+
+    if (col < SPEED_COLS-1)
+    {
+        t1.speed = t3.speed = speed_index[col];
+        t2.speed = t4.speed = speed_index[col+1];
+        t1.col = t3.col = col;
+        t2.col = t4.col = col+1;
+    }
+    else
+    {
+        t1.speed = t3.speed = speed_index[col-1];
+        t2.speed = t4.speed = speed_index[col];
+        t1.col = t3.col = col-1;
+        t2.col = t4.col = col;
+    }
+
+    // set the current speed and power point (t0)
+    t0.speed = x_speed;
+    t0.power = y_power;
+
+    // ensure current speed and power values are not outside of the
+    // surrounding data points, this should only be possible at edge of table
+    if (t0.speed < min(t1.speed,t2.speed))
+        t0.speed = min(t1.speed,t2.speed);
+
+    if (t0.speed > max(t1.speed,t2.speed))
+        t0.speed = max(t1.speed,t2.speed);
+
+    if (t0.power < min(t1.power,t3.power))
+        t0.power = min(t1.power,t3.power);
+
+    if (t0.power > max(t1.power,t3.power))
+        t0.power = max(t1.power,t3.power);
+
+    // lookup the resistance values for each surrounding point
+    t1.res = lookup_table_1d[((SPEED_COLS*t1.row) + t1.col)];
+    t2.res = lookup_table_1d[((SPEED_COLS*t2.row) + t2.col)];
+    t3.res = lookup_table_1d[((SPEED_COLS*t3.row) + t3.col)];
+    t4.res = lookup_table_1d[((SPEED_COLS*t4.row) + t4.col)];
+
+    // get the interpolated resistance value based on these points..
+    resistance = Interpolate(&t0, &t1, &t2, &t3, &t4);
+
+    // ensure final resistance value falls within our expected 1 - 100 range
+    if (resistance < 51)
+        resistance = 51;
+    if (resistance > 150)
+        resistance = 150;
+    resistance = resistance - 50;
+
+    return resistance;
+}
 
 double GetVirtualPower(double speed, double slope)
 {
@@ -282,16 +409,42 @@ void CalculatePosition(TrainerData *data)
 {
     uint8_t position;
     double speed, load, slope;
-    double avg_speed;
+    double avg_speed = 0;
     static double total_speed;
+
+#if 1
+static int total_speed_init;
+
+    // correctly initialise total_speed on first pass.
+    // do we really want to do this? will ramp up from 0 over
+    // a couple of seconds without - which may be preferable,
+    // and what about the start of subsequent erg files?
+    if (total_speed_init == 0)
+    {
+        total_speed = data->current_speed / 10.0 * SPEED_SAMPLES;
+        total_speed_init = 1;
+    }
+#endif
+
+    if (data->mode == BT_CALIBRATE)
+    {
+        // in calibration mode
+        // for initial testing, just linear mapping between slope and position
+        // todo: assumes gradient data is populated, need to confirm in GC
+        avg_speed = data->current_speed / 10.0;
+        position = data->target_gradient / 2.5;
+
+        if (position < 1)
+            position = 1;
+        if (position > SERVO_RES)
+            position = SERVO_RES;
+
+        data->target_position = position;
+    }
 
     if (data->mode == BT_SSMODE)
     {
         // in slope mode
-
-        // for initial testing, just linear mapping between slope and position
-        // position = data->target_gradient / 2.5;
-
         // Convert gradient representation (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
         // into a fractional slope (i.e. -5% = -0.05, 0% = 0.0, 10% = 0.1)
         slope = (((data->target_gradient / 10.0) - 10) / 100);
@@ -300,9 +453,9 @@ void CalculatePosition(TrainerData *data)
         speed = data->current_speed / 10.0;
 
         // Track average values for the realtime speed
-        total_speed -= total_speed / 10;      // keep 9/10
-        total_speed += speed;                 // and add in 1/10 from the new sample
-        avg_speed = total_speed / 10;         // and use composite rolling average
+        total_speed -= total_speed / SPEED_SAMPLES;     // keep 9/10
+        total_speed += speed;                           // and add in 1/10 from the new sample
+        avg_speed = total_speed / SPEED_SAMPLES;        // and use composite rolling average
 
         // Estimate the required power to achieve current speed & slope
         load = GetVirtualPower(avg_speed, slope);
@@ -312,8 +465,8 @@ void CalculatePosition(TrainerData *data)
         if (load < 50)
             load = 50;
 
-        // Estimate the required resistance level for current speed and estimated power
-        position = GetResistance(avg_speed, load);
+        // Look up the required resistance level for current speed and estimated power
+        position = LookupResistance(avg_speed, load);
 
         if (position < 1)
             position = 1;
@@ -325,21 +478,20 @@ void CalculatePosition(TrainerData *data)
     if (data->mode == BT_ERGOMODE)
     {
         // in ergo mode
-        // testing functions from 3D curve/surface fitting site zunzun.com
-        // to model the resistance level for a given speed and load
 
         // Convert realtime speed into kph
         speed = data->current_speed / 10.0;
 
         // Track average values for the realtime speed
-        total_speed -= total_speed / 10;      // keep 9/10
-        total_speed += speed;                 // and add in 1/10 from the new sample
-        avg_speed = total_speed / 10;         // and use composite rolling average
+        total_speed -= total_speed / SPEED_SAMPLES;     // keep 9/10
+        total_speed += speed;                           // and add in 1/10 from the new sample
+        avg_speed = total_speed / SPEED_SAMPLES;        // and use composite rolling average
 
         // convert load into watts
         load = data->target_load / 10.0;
 
-        position = GetResistance(avg_speed, load);
+        // Look up the required resistance level for current speed and estimated power
+        position = LookupResistance(avg_speed, load);
 
         if (position < 1)
             position = 1;
