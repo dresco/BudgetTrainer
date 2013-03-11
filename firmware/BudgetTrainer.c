@@ -356,6 +356,8 @@ void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
             // Invalidate the data header and abort the receive if the timer has expired
             if (TCNT3 == 0)
             {
+                PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
+
 #ifdef DEBUG_OUTPUT
                 printf("timeout while reading data buffer\n");
 #endif
@@ -386,7 +388,8 @@ void SetupHardware(TrainerData *data)
     sei();                                              // Enable global interrupts
 }
 
-void ReadData(uint8_t *buf, uint8_t size)
+// Returns 1 if valid data packet received, else returns 0 for invalid data or read timeout
+uint8_t ReadData(uint8_t *buf, uint8_t size)
 {
     USB_ReadBuffer(buf, size);
     if ((buf[0] != 0xAA) || (buf[1] != 0x01))
@@ -399,7 +402,9 @@ void ReadData(uint8_t *buf, uint8_t size)
         // todo: handle this situation, possibly means we're out of sync
         //       and receiving part way though a packet? read in the remaining
         //       bytes until we get back in sync?
+        return 0;
     }
+    return 1;
 }
 
 void WriteData(uint8_t *buf, uint8_t size)
@@ -412,7 +417,7 @@ void GetButtonStatus(TrainerData *data)
     static uint8_t last_buttons = 0;
     uint8_t cur_buttons;
 
-    PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
+    //PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
 
     // in lieu of debounce support, just make sure we don't send
     // multiple lap button presses in a row, as probably not what
@@ -614,6 +619,7 @@ int main()
 {
     uint8_t RequestBuffer[BT_REQUEST_SIZE];
     uint8_t ResponseBuffer[BT_RESPONSE_SIZE];
+    uint8_t control_msg;
 
     TrainerData data;
 
@@ -625,25 +631,32 @@ int main()
 
     while (1)
     {
-        // read the control message from the pc
-        // todo: currently blocks forever, add timeout
-        ReadData(RequestBuffer, BT_REQUEST_SIZE);
+        // read the control message from the pc, times out after 100ms
+        // returns 1 for success, 0 for invalid data or timeout
+        // Can expect valid control messages from GC every 200ms
+        control_msg = ReadData(RequestBuffer, BT_REQUEST_SIZE);
 
-        ProcessControlMessage(RequestBuffer, &data);
+        // only update the trainer data structure following a valid control message
+        if (control_msg)
+            ProcessControlMessage(RequestBuffer, &data);
 
-        // calculate required motor position
+        // calculate required motor position, do this anyway for 100ms refresh
         CalculatePosition(&data);
 
-        // move motor towards required position
+        // move motor towards required position, do this anyway for 100ms refresh
         MotorController(&data);
 
-        // get the current button status
+        // get the current button status, do this anyway for 100ms refresh
         GetButtonStatus(&data);
 
-        // update response packet with button and position data
-        PrepareStatusMessage(ResponseBuffer, &data);
+        // Only send a reply back to GC in response to a valid control message
+        if (control_msg)
+        {
+            // update response packet with button and position data
+            PrepareStatusMessage(ResponseBuffer, &data);
 
-        // update pc with current status
-        WriteData(ResponseBuffer, BT_RESPONSE_SIZE);
+            // update pc with current status
+            WriteData(ResponseBuffer, BT_RESPONSE_SIZE);
+        }
     }
 }
