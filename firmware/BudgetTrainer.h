@@ -63,7 +63,7 @@
 //#include <avr/sleep.h>
 //#include <util/delay.h>
 
-#define DEBUG_OUTPUT
+//#define DEBUG_OUTPUT
 
 #define USART_BAUDRATE 9600
 #define USART_BAUD_PRESCALE (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
@@ -119,3 +119,5 @@ typedef struct TableEntry
 #define SERVO_MIDSTEP       (SERVO_RES+1)/2             // Assuming starting at 1, there are 99 steps, mid-way is 50.5
 
 #define SPEED_SAMPLES       10                          // How many speed samples to average
+
+#define RECEIVE_INTERVAL    6250                        // 100ms receive timeout (clk/256 prescaler)

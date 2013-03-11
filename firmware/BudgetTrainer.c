@@ -288,6 +288,12 @@ void USART_Setup(void)
 
 void TimerSetup(void)
 {
+    // Configure timer3 for receive data timeout
+    TCCR3B |= (1 << WGM32);                             // Configure timer for CTC mode 2
+    OCR3A = RECEIVE_INTERVAL;                           // Set TOP value to 100ms
+    TIMSK3 |= (1 << TOIE3);                             // Enable overflow interrupt
+
+    // Configure timer1 for servo control output
     TCCR1B |= (1 << WGM13);                             // Configure timer for PWM Mode 8 (phase and frequency correct)
     ICR1 = SERVO_INTERVAL;                              // Set TOP value for the wave form to 20ms
     TCCR1A |= ((1 << COM1A1));                          // Clear OC1A on upcount compare and set on downcount compare
@@ -336,10 +342,26 @@ void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
     uint8_t i;
     int16_t c;
 
+    // set the initial timer value to 1 in case we get to the check before the first timer tick
+    TCNT3 = 1;
+
+    // (re)start the receive timer with prescaler of 256 (timeout the request after 100ms)
+    TCCR3B |= (1 << CS32);
+
     for (i = 0; i < BuffSize; i++)
     {
         do {
             c = usb_serial_getchar();
+
+            // Invalidate the data header and abort the receive if the timer has expired
+            if (TCNT3 == 0)
+            {
+#ifdef DEBUG_OUTPUT
+                printf("timeout while reading data buffer\n");
+#endif
+                BuffToRead[0] = 0x00;
+                return;
+            }
         } while (c == -1);
 
         BuffToRead[i] = c;
@@ -540,7 +562,15 @@ void PrepareStatusMessage(uint8_t *buf, TrainerData *data)
     buf[4] = data->current_position;
 }
 
-ISR( TIMER1_OVF_vect)
+ISR(TIMER3_OVF_vect)
+{
+    // timer3 overflow interrupt, will get here 100ms after the start of a read operation.
+    // Setting the timer value to 0 will abort the read if it's still in progress
+    TCCR3B |= 0;                                        // Stop the timer
+    TCNT3 = 0;                                          // Reset timer value to 0
+}
+
+ISR(TIMER1_OVF_vect)
 {
     static uint8_t count = 0;
     uint8_t i;
