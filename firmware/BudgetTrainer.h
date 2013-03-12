@@ -64,6 +64,7 @@
 //#include <util/delay.h>
 
 //#define DEBUG_OUTPUT
+#define LOOKUP_TABLE
 
 #define USART_BAUDRATE 9600
 #define USART_BAUD_PRESCALE (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)

@@ -26,6 +26,7 @@
 // volatile globals - accessed from interrupt handlers
 volatile uint8_t buttons = 0;
 
+#ifdef LOOKUP_TABLE
 uint8_t Interpolate(TableEntry *t0, TableEntry *t1, TableEntry *t2, TableEntry *t3, TableEntry *t4)
 {
     uint8_t i = 0;
@@ -151,6 +152,7 @@ double LookupResistance(double x_speed, double y_power)
 
     return resistance;
 }
+#endif
 
 double GetVirtualPower(double speed, double slope)
 {
@@ -493,7 +495,11 @@ static int total_speed_init;
             load = 50;
 
         // Look up the required resistance level for current speed and estimated power
+#ifdef LOOKUP_TABLE
         position = LookupResistance(avg_speed, load);
+#else
+        position = GetResistance(avg_speed, load);
+#endif
 
         if (position < 1)
             position = 1;
@@ -518,7 +524,11 @@ static int total_speed_init;
         load = data->target_load / 10.0;
 
         // Look up the required resistance level for current speed and estimated power
+#ifdef LOOKUP_TABLE
         position = LookupResistance(avg_speed, load);
+#else
+        position = GetResistance(avg_speed, load);
+#endif
 
         if (position < 1)
             position = 1;
