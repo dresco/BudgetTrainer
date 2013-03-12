@@ -55,13 +55,15 @@
 
 #include <stdio.h>
 #include <avr/io.h>
+#include <avr/wdt.h>
 #include <avr/interrupt.h>
 #include <avr/power.h>
+#include <stdbool.h>
 #include <math.h>
-//#include <stdlib.h>
-//#include <string.h>
-//#include <avr/sleep.h>
-//#include <util/delay.h>
+
+#include "Descriptors.h"
+#include "LUFA/Drivers/Board/LEDs.h"
+#include "LUFA/Drivers/USB/USB.h"
 
 //#define DEBUG_OUTPUT
 #define LOOKUP_TABLE
@@ -122,3 +124,17 @@ typedef struct TableEntry
 #define SPEED_SAMPLES       10                          // How many speed samples to average
 
 #define RECEIVE_INTERVAL    6250                        // 100ms receive timeout (clk/256 prescaler)
+
+// LUFA LED support macros
+#define LEDMASK_USB_NOTREADY     LEDS_LED1              // Interface not ready
+#define LEDMASK_USB_ENUMERATING (LEDS_LED2 | LEDS_LED3) // Interface is enumerating
+#define LEDMASK_USB_READY       (LEDS_LED2 | LEDS_LED4) // Interface is ready
+#define LEDMASK_USB_ERROR       (LEDS_LED1 | LEDS_LED3) // Error has occurred
+
+// LUFA Function Prototypes
+void EVENT_USB_Device_Connect(void);
+void EVENT_USB_Device_Disconnect(void);
+void EVENT_USB_Device_ConfigurationChanged(void);
+void EVENT_USB_Device_ControlRequest(void);
+
+
