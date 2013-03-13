@@ -505,7 +505,7 @@ void CalculatePosition(TrainerData *data)
     double speed, power, load, slope;
     double avg_speed = 0, avg_power = 0;
     static double total_speed, total_power, last_load;
-    static int8_t trim;
+    static int8_t trim = 0, trim_countdown = 50;
 
 #if 1
 static int total_speed_init;
@@ -614,44 +614,58 @@ static int total_speed_init;
         // Trim the selected resistance based on real-time power data.
         //
 
-        // If the requested load has changed, reset the trim value
+        // If the requested load has changed, reset the trim value to 0,
+        // and reset the countdown timer to 5 seconds.
         if (last_load != load)
-            trim = 0;
-
-        // If the difference between requested load and average power is
-        // greater than 5% of the load, then trim the resistance value
-        if (abs(load - avg_power) > (load/20))
         {
-            if (avg_power > load)
-            {
-                if (trim > -MAX_TRIM)
-                    trim--;
-            }
-            else if (avg_power < load)
-            {
-                if (trim < MAX_TRIM)
-                    trim++;
-            }
+            trim = 0;
+            trim_countdown = TRIM_DELAY;
+        }
+        else
+        {
+            if (trim_countdown > 0)
+                trim_countdown--;
         }
 
-        // Ensure that applying the trim doesn't overflow our data type,
-        // and adjust the position accordingly
-        if (trim)
+        // Only attempt to trim the resistance if load has been static for at
+        // least 5 seconds
+        if (!trim_countdown)
         {
-            if ((position + trim >= 1) && (position + trim <= SERVO_RES))
+            // If the difference between requested load and average power is
+            // greater than 5% of the load, then trim the resistance value
+            if (abs(load - avg_power) > (load/20))
             {
-                position = position + trim;
-#ifdef DEBUG_OUTPUT
-                sprintf(DebugBuffer, "trim applied successfully: %i\n", trim);
-                USB_SendDebugBuffer(DebugBuffer);
-#endif
+                if (avg_power > load)
+                {
+                    if (trim > -MAX_TRIM)
+                        trim--;
+                }
+                else if (avg_power < load)
+                {
+                    if (trim < MAX_TRIM)
+                        trim++;
+                }
             }
-            else
+
+            // Ensure that applying the trim doesn't overflow our data type,
+            // and adjust the position accordingly
+            if (trim)
             {
+                if ((position + trim >= 1) && (position + trim <= SERVO_RES))
+                {
+                    position = position + trim;
 #ifdef DEBUG_OUTPUT
-                sprintf(DebugBuffer, "trim would exceed valid range\n");
-                USB_SendDebugBuffer(DebugBuffer);
+                    sprintf(DebugBuffer, "trim applied successfully: %i\n", trim);
+                    USB_SendDebugBuffer(DebugBuffer);
 #endif
+                }
+                else
+                {
+#ifdef DEBUG_OUTPUT
+                    sprintf(DebugBuffer, "trim would exceed valid range\n");
+                    USB_SendDebugBuffer(DebugBuffer);
+#endif
+                }
             }
         }
 
@@ -661,14 +675,14 @@ static int total_speed_init;
             position = SERVO_RES;
 
         data->target_position = position;
+
+        // save the current load
+        last_load = load;
     }
 
     // speed override, if lower than 5kph set resistance to minimum
     if (avg_speed < 5)
         data->target_position = 1;
-
-    // save the current load
-    last_load = load;
 }
 
 void ProcessControlMessage(uint8_t *buf, TrainerData *data)

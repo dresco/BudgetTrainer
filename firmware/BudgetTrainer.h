@@ -122,6 +122,7 @@ typedef struct TableEntry
 #define SPEED_SAMPLES       10                          // How many speed samples to average (note: sampled at 2x update rate)
 #define POWER_SAMPLES       100                         // How many power samples to average (note: sampled at 10x update rate)
 #define MAX_TRIM            10                          // Maximum change to calculated resistance, based on real-time power vs load
+#define TRIM_DELAY          50                          // How many samples at constant load before attempting to trim resistance
 
 #define RECEIVE_INTERVAL    6250                        // 100ms receive timeout (clk/256 prescaler)
 
