@@ -54,6 +54,7 @@
 // 5             0x00 -- UNUSED
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <avr/io.h>
 #include <avr/wdt.h>
 #include <avr/interrupt.h>
@@ -118,7 +119,9 @@ typedef struct TableEntry
 #define SERVO_RES           100.00                      // Target resolution of 100 positions (99 steps between so make it a double)
 #define SERVO_MIDSTEP       (SERVO_RES+1)/2             // Assuming starting at 1, there are 99 steps, mid-way is 50.5
 
-#define SPEED_SAMPLES       10                          // How many speed samples to average
+#define SPEED_SAMPLES       10                          // How many speed samples to average (note: sampled at 2x update rate)
+#define POWER_SAMPLES       100                         // How many power samples to average (note: sampled at 10x update rate)
+#define MAX_TRIM            10                          // Maximum change to calculated resistance, based on real-time power vs load
 
 #define RECEIVE_INTERVAL    6250                        // 100ms receive timeout (clk/256 prescaler)
 

@@ -5,6 +5,7 @@ software:
 firmware:
 
  - Refine calibration and resistance calculation
+ - trim resistance based on real-time power data
  - only create 2nd CDC-ACM interface when built with debug support
  - add support for disconnected (no PC) mode
  - handle invalid serial data a bit better (sync to start of message?)
