@@ -20,11 +20,85 @@
 // THE SOFTWARE.
 
 #include "BudgetTrainer.h"
-#include "usb_serial.h"
 #include "lookup.h"
 
 // volatile globals - accessed from interrupt handlers
 volatile uint8_t buttons = 0;
+
+// global debug buffer
+char DebugBuffer[64];
+
+// LUFA CDC Class driver interface configuration and state information. This structure is
+// passed to all CDC Class driver functions, so that multiple instances of the same class
+// within a device can be differentiated from one another.
+//
+// This is for the first CDC interface which is used for Golden Cheetah I/O.
+//
+USB_ClassInfo_CDC_Device_t VirtualSerial1_CDC_Interface =
+{
+    .Config =
+    {
+        .ControlInterfaceNumber = 0,
+        .DataINEndpoint =
+        {
+            .Address = CDC1_TX_EPADDR,
+            .Size    = CDC_TXRX_EPSIZE,
+            .Banks   = 1,
+        },
+        .DataOUTEndpoint =
+        {
+            .Address = CDC1_RX_EPADDR,
+            .Size    = CDC_TXRX_EPSIZE,
+            .Banks   = 1,
+        },
+        .NotificationEndpoint =
+        {
+            .Address = CDC1_NOTIFICATION_EPADDR,
+            .Size    = CDC_NOTIFICATION_EPSIZE,
+            .Banks   = 1,
+        },
+    },
+};
+
+// LUFA CDC Class driver interface configuration and state information. This structure is
+// passed to all CDC Class driver functions, so that multiple instances of the same class
+// within a device can be differentiated from one another.
+//
+// This is for the second CDC interface which is used for debug output.
+// todo: only create this interface when compiled for debug output
+//
+USB_ClassInfo_CDC_Device_t VirtualSerial2_CDC_Interface =
+{
+    .Config =
+    {
+        .ControlInterfaceNumber = 2,
+        .DataINEndpoint =
+        {
+            .Address = CDC2_TX_EPADDR,
+            .Size    = CDC_TXRX_EPSIZE,
+            .Banks   = 1,
+        },
+        .DataOUTEndpoint =
+        {
+            .Address = CDC2_RX_EPADDR,
+            .Size    = CDC_TXRX_EPSIZE,
+            .Banks   = 1,
+        },
+        .NotificationEndpoint =
+        {
+            .Address = CDC2_NOTIFICATION_EPADDR,
+            .Size    = CDC_NOTIFICATION_EPSIZE,
+            .Banks   = 1,
+        },
+    },
+};
+
+void USB_SendDebugBuffer(char* buffer)
+{
+    Endpoint_SelectEndpoint(VirtualSerial2_CDC_Interface.Config.DataINEndpoint.Address);
+    if (Endpoint_IsINReady())
+        CDC_Device_SendString(&VirtualSerial2_CDC_Interface, buffer);
+}
 
 #ifdef LOOKUP_TABLE
 uint8_t Interpolate(TableEntry *t0, TableEntry *t1, TableEntry *t2, TableEntry *t3, TableEntry *t4)
@@ -222,9 +296,12 @@ void MotorController(TrainerData *data)
 #ifdef DEBUG_OUTPUT
     angle_rad = asin(X_AXIS_MAX);                       // Maximum rotational angle in radians
     angle_deg = angle_rad * 180 / M_PI;                 // Convert radians to degrees
-    printf("max x_axis %f\n", X_AXIS_MAX);
-    printf("max angle_rad %f\n", angle_rad);
-    printf("max angle_deg %f\n", angle_deg);
+    sprintf(DebugBuffer, "max x_axis %f\n", X_AXIS_MAX);
+    USB_SendDebugBuffer(DebugBuffer);
+    sprintf(DebugBuffer, "max angle_rad %f\n", angle_rad);
+    USB_SendDebugBuffer(DebugBuffer);
+    sprintf(DebugBuffer, "max angle_deg %f\n", angle_deg);
+    USB_SendDebugBuffer(DebugBuffer);
 #endif
 
     target_position = data->target_position;
@@ -233,7 +310,8 @@ void MotorController(TrainerData *data)
     if ((target_position >= 1) && (target_position <= SERVO_RES))
     {
 #ifdef DEBUG_OUTPUT
-        printf("Target position %i\n", target_position);
+        sprintf(DebugBuffer, "Target position %i\n", target_position);
+        USB_SendDebugBuffer(DebugBuffer);
 #endif
 
         // basic rate limiting code to slow large arm movements,
@@ -266,8 +344,9 @@ void MotorController(TrainerData *data)
                 SERVO_DEGREE*2);                        //   required angle (in given direction)
 
 #ifdef DEBUG_OUTPUT
-        printf("Setting x_axis to %f, arm angle to %f, servo pulse to %i\n",
+        sprintf(DebugBuffer, "Setting x_axis to %f, arm angle to %f, servo pulse to %i\n",
                 x_axis, angle_deg, OCR1A);
+        USB_SendDebugBuffer(DebugBuffer);
 #endif
 
         data->current_position = current_position;
@@ -275,17 +354,10 @@ void MotorController(TrainerData *data)
     else
     {
 #ifdef DEBUG_OUTPUT
-        printf("Invalid entry, please try again...\n");
+        sprintf(DebugBuffer, "Invalid entry, please try again...\n");
+        USB_SendDebugBuffer(DebugBuffer);
 #endif
     }
-}
-
-void USART_Setup(void)
-{
-    UCSR1B |= (1 << TXEN1) | (1 << RXEN1);              // Turn on the transmit / receive circuitry
-
-    UBRR1L = USART_BAUD_PRESCALE;                       // Load lower 8-bits of the baud rate register
-    UBRR1H = (USART_BAUD_PRESCALE >> 8);                // Load upper 8-bits of the baud rate register
 }
 
 void TimerSetup(void)
@@ -315,25 +387,13 @@ void PortSetup()
     PORTF |= (1 << 7);                                  // Enable pullup resistor on port F7 (Cancel)
 }
 
-uint8_t USART_GetChar(void)
-{
-    while (!(UCSR1A & (1 << RXC1)));
-    return UDR1;
-}
-
-void USART_SendChar(char ByteToSend)
-{
-    while ((UCSR1A & (1 << UDRE1)) == 0);               // Wait until UDR is ready for more data
-    UDR1 = ByteToSend;                                  // Write the current byte
-}
-
 void USB_SendBuffer(uint8_t* BuffToSend, uint8_t BuffSize)
 {
     uint8_t i;
 
     for (i = 0; i < BuffSize; i++)
     {
-        usb_serial_putchar(BuffToSend[i]);
+        CDC_Device_SendByte(&VirtualSerial1_CDC_Interface, BuffToSend[i]);
     }
 
     // wait for transmit to complete before returning.
@@ -353,7 +413,7 @@ void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
     for (i = 0; i < BuffSize; i++)
     {
         do {
-            c = usb_serial_getchar();
+            c = CDC_Device_ReceiveByte(&VirtualSerial1_CDC_Interface);
 
             // Invalidate the data header and abort the receive if the timer has expired
             if (TCNT3 == 0)
@@ -361,7 +421,8 @@ void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
                 PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
 
 #ifdef DEBUG_OUTPUT
-                printf("timeout while reading data buffer\n");
+                sprintf(DebugBuffer, "timeout while reading data buffer\n");
+                USB_SendDebugBuffer(DebugBuffer);
 #endif
                 BuffToRead[0] = 0x00;
                 return;
@@ -374,11 +435,14 @@ void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
 
 void SetupHardware(TrainerData *data)
 {
+    MCUSR &= ~(1 << WDRF);                              // Disable watchdog if enabled by bootloader/fuses
+    wdt_disable();
+
     clock_prescale_set(clock_div_1);                    // Disable clock prescaler (for 8MHz operation)
 
-    usb_init();
+    LEDs_Init();
+    USB_Init();
 
-    USART_Setup();
     PortSetup();
 
     data->target_position = 1;                          // Set the initial arm position to minimum before we
@@ -398,7 +462,8 @@ uint8_t ReadData(uint8_t *buf, uint8_t size)
     {
         // if we're here then the packet contains unexpected data, just log for now
 #ifdef DEBUG_OUTPUT
-        printf("packet contains unexpected data\n");
+        sprintf(DebugBuffer, "packet contains unexpected data\n");
+        USB_SendDebugBuffer(DebugBuffer);
 #endif
 
         // todo: handle this situation, possibly means we're out of sync
@@ -614,16 +679,35 @@ ISR(TIMER1_OVF_vect)
     }
 }
 
-#ifdef DEBUG_OUTPUT
-static int uart_putc(char c, FILE *unused)
+// Event handler for the library USB Connection event
+void EVENT_USB_Device_Connect(void)
 {
-    while (!(UCSR1A & (1 << UDRE1)));
-    UDR1 = c;
-    return 0;
+    LEDs_SetAllLEDs(LEDMASK_USB_ENUMERATING);
 }
 
-FILE uart_str = FDEV_SETUP_STREAM(uart_putc, NULL, _FDEV_SETUP_WRITE);
-#endif
+// Event handler for the library USB Disconnection event
+void EVENT_USB_Device_Disconnect(void)
+{
+    LEDs_SetAllLEDs(LEDMASK_USB_NOTREADY);
+}
+
+// Event handler for the library USB Configuration Changed event
+void EVENT_USB_Device_ConfigurationChanged(void)
+{
+    bool ConfigSuccess = true;
+
+    ConfigSuccess &= CDC_Device_ConfigureEndpoints(&VirtualSerial1_CDC_Interface);
+    ConfigSuccess &= CDC_Device_ConfigureEndpoints(&VirtualSerial2_CDC_Interface);
+
+    LEDs_SetAllLEDs(ConfigSuccess ? LEDMASK_USB_READY : LEDMASK_USB_ERROR);
+}
+
+// Event handler for the library USB Control Request reception event
+void EVENT_USB_Device_ControlRequest(void)
+{
+    CDC_Device_ProcessControlRequest(&VirtualSerial1_CDC_Interface);
+    CDC_Device_ProcessControlRequest(&VirtualSerial2_CDC_Interface);
+}
 
 int main()
 {
@@ -634,13 +718,13 @@ int main()
     TrainerData data;
 
     SetupHardware(&data);
-
-#ifdef DEBUG_OUTPUT
-    stdout = &uart_str;                                 // redirect printf and scanf to UART for debug output
-#endif
+    LEDs_SetAllLEDs(LEDMASK_USB_NOTREADY);
 
     while (1)
     {
+        // Discard all received data on the second (debug) CDC interface
+        CDC_Device_ReceiveByte(&VirtualSerial2_CDC_Interface);
+
         // read the control message from the pc, times out after 100ms
         // returns 1 for success, 0 for invalid data or timeout
         // Can expect valid control messages from GC every 200ms
@@ -668,5 +752,9 @@ int main()
             // update pc with current status
             WriteData(ResponseBuffer, BT_RESPONSE_SIZE);
         }
+
+        CDC_Device_USBTask(&VirtualSerial1_CDC_Interface);
+        CDC_Device_USBTask(&VirtualSerial2_CDC_Interface);
+        USB_USBTask();
     }
 }
