@@ -1,3 +1,4 @@
+#ifdef LOOKUP_TABLE
 #define SPEED_COLS 12
 #define POWER_ROWS 12
 
@@ -33,3 +34,4 @@ uint8_t lookup_table_1d[POWER_ROWS * SPEED_COLS] = {
 /* 450,*/ 170, 180, 165, 152, 142, 123, 108, 103,  95,  89,  85,  80,
 /* 500,*/ 170, 180, 165, 152, 155, 131, 112, 108,  99,  93,  89,  85
 };
+#endif

@@ -63,6 +63,9 @@
 //#include <avr/sleep.h>
 //#include <util/delay.h>
 
+//#define DEBUG_OUTPUT
+#define LOOKUP_TABLE
+
 #define USART_BAUDRATE 9600
 #define USART_BAUD_PRESCALE (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
 
@@ -105,9 +108,9 @@ typedef struct TableEntry
     double power;
 } TableEntry;
 
-#define SERVO_INTERVAL      10000                       // 20ms (1MHz timer, 10ms up & 10ms down)
-#define SERVO_MIDPOINT      750                         // 1.5ms output pulse (1,500 us) for centre angle
-#define SERVO_MAX_DIFF      300                         // 0.6ms change in output pulse for max angle
+#define SERVO_INTERVAL      20000                       // 20ms (2MHz timer, 10ms up & 10ms down)
+#define SERVO_MIDPOINT      1500                        // 1.5ms output pulse (1,500 us) for centre angle
+#define SERVO_MAX_DIFF      600                         // 0.6ms change in output pulse for max angle
 #define SERVO_DEGREE        6.25                        // Nominally 5.555us per degree of rotation (1000/180),
                                                         // but measured at ~6.25us (625us per 100 degrees rotation)
 #define ARM_RADIUS          19.0                        // Effective radius of the servo arm in mm
@@ -117,3 +120,5 @@ typedef struct TableEntry
 #define SERVO_MIDSTEP       (SERVO_RES+1)/2             // Assuming starting at 1, there are 99 steps, mid-way is 50.5
 
 #define SPEED_SAMPLES       10                          // How many speed samples to average
+
+#define RECEIVE_INTERVAL    6250                        // 100ms receive timeout (clk/256 prescaler)

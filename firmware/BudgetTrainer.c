@@ -20,11 +20,13 @@
 // THE SOFTWARE.
 
 #include "BudgetTrainer.h"
+#include "usb_serial.h"
 #include "lookup.h"
 
 // volatile globals - accessed from interrupt handlers
 volatile uint8_t buttons = 0;
 
+#ifdef LOOKUP_TABLE
 uint8_t Interpolate(TableEntry *t0, TableEntry *t1, TableEntry *t2, TableEntry *t3, TableEntry *t4)
 {
     uint8_t i = 0;
@@ -150,6 +152,7 @@ double LookupResistance(double x_speed, double y_power)
 
     return resistance;
 }
+#endif
 
 double GetVirtualPower(double speed, double slope)
 {
@@ -260,7 +263,7 @@ void MotorController(TrainerData *data)
         angle_deg = angle_rad * 180 / M_PI;             // Convert radians to degrees
 
         OCR1A = SERVO_MIDPOINT - (angle_deg *           // Timing value to get servo rotation to
-                SERVO_DEGREE);                          //   required angle (in given direction)
+                SERVO_DEGREE*2);                        //   required angle (in given direction)
 
 #ifdef DEBUG_OUTPUT
         printf("Setting x_axis to %f, arm angle to %f, servo pulse to %i\n",
@@ -279,71 +282,101 @@ void MotorController(TrainerData *data)
 
 void USART_Setup(void)
 {
-    UCSR0B |= (1 << TXEN0) | (1 << RXEN0);              // Turn on the transmit / receive circuitry
+    UCSR1B |= (1 << TXEN1) | (1 << RXEN1);              // Turn on the transmit / receive circuitry
 
-    UBRR0L = USART_BAUD_PRESCALE;                       // Load lower 8-bits of the baud rate register
-    UBRR0H = (USART_BAUD_PRESCALE >> 8);                // Load upper 8-bits of the baud rate register
+    UBRR1L = USART_BAUD_PRESCALE;                       // Load lower 8-bits of the baud rate register
+    UBRR1H = (USART_BAUD_PRESCALE >> 8);                // Load upper 8-bits of the baud rate register
 }
 
 void TimerSetup(void)
 {
+    // Configure timer3 for receive data timeout
+    TCCR3B |= (1 << WGM32);                             // Configure timer for CTC mode 2
+    OCR3A = RECEIVE_INTERVAL;                           // Set TOP value to 100ms
+    TIMSK3 |= (1 << TOIE3);                             // Enable overflow interrupt
+
+    // Configure timer1 for servo control output
     TCCR1B |= (1 << WGM13);                             // Configure timer for PWM Mode 8 (phase and frequency correct)
     ICR1 = SERVO_INTERVAL;                              // Set TOP value for the wave form to 20ms
     TCCR1A |= ((1 << COM1A1));                          // Clear OC1A on upcount compare and set on downcount compare
     TIMSK1 |= (1 << TOIE1);                             // Interrupt at bottom - TIMER1_OVF_vect
 
-    TCCR1B |= (1 << CS11);                              // Start timer with prescaler of 8 = 1MHz timer
+    TCCR1B |= (1 << CS11);                              // Start timer with prescaler of 8 = 2MHz timer
 }
 
 void PortSetup()
 {
-    DDRB |= (1 << 0);                                   // Set port B0 as output for debug LED
-    DDRB |= (1 << PB1);                                 // Enable output on PINB1 (OC1A)
+    DDRE |= (1 << 6);                                   // Set port E6 as output for debug LED
+    DDRB |= (1 << PB5);                                 // Enable output on PINB5 (OC1A)
 
-    PORTC |= (1 << 0);                                  // Enable pullup resistor on port C0 (Enter)
-    PORTC |= (1 << 1);                                  // Enable pullup resistor on port C1 (Minus)
-    PORTC |= (1 << 2);                                  // Enable pullup resistor on port C2 (Plus)
-    PORTC |= (1 << 3);                                  // Enable pullup resistor on port C3 (Cancel)
+    PORTF |= (1 << 4);                                  // Enable pullup resistor on port F4 (Enter)
+    PORTF |= (1 << 5);                                  // Enable pullup resistor on port F5 (Minus)
+    PORTF |= (1 << 6);                                  // Enable pullup resistor on port F6 (Plus)
+    PORTF |= (1 << 7);                                  // Enable pullup resistor on port F7 (Cancel)
 }
 
 uint8_t USART_GetChar(void)
 {
-    while (!(UCSR0A & (1 << RXC0)));
-    return UDR0;
+    while (!(UCSR1A & (1 << RXC1)));
+    return UDR1;
 }
 
 void USART_SendChar(char ByteToSend)
 {
-    while ((UCSR0A & (1 << UDRE0)) == 0);               // Wait until UDR is ready for more data
-    UDR0 = ByteToSend;                                  // Write the current byte
+    while ((UCSR1A & (1 << UDRE1)) == 0);               // Wait until UDR is ready for more data
+    UDR1 = ByteToSend;                                  // Write the current byte
 }
 
-void USART_SendBuffer(uint8_t* BuffToSend, uint8_t BuffSize)
+void USB_SendBuffer(uint8_t* BuffToSend, uint8_t BuffSize)
 {
     uint8_t i;
 
     for (i = 0; i < BuffSize; i++)
     {
-        USART_SendChar(BuffToSend[i]);
+        usb_serial_putchar(BuffToSend[i]);
     }
 
     // wait for transmit to complete before returning.
-    while (!(UCSR0A & (1 << TXC0)));
 }
 
-void USART_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
+void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
 {
     uint8_t i;
+    int16_t c;
+
+    // set the initial timer value to 1 in case we get to the check before the first timer tick
+    TCNT3 = 1;
+
+    // (re)start the receive timer with prescaler of 256 (timeout the request after 100ms)
+    TCCR3B |= (1 << CS32);
 
     for (i = 0; i < BuffSize; i++)
     {
-        BuffToRead[i] = USART_GetChar();
+        do {
+            c = usb_serial_getchar();
+
+            // Invalidate the data header and abort the receive if the timer has expired
+            if (TCNT3 == 0)
+            {
+                PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
+
+#ifdef DEBUG_OUTPUT
+                printf("timeout while reading data buffer\n");
+#endif
+                BuffToRead[0] = 0x00;
+                return;
+            }
+        } while (c == -1);
+
+        BuffToRead[i] = c;
     }
 }
 
 void SetupHardware(TrainerData *data)
 {
     clock_prescale_set(clock_div_1);                    // Disable clock prescaler (for 8MHz operation)
+
+    usb_init();
 
     USART_Setup();
     PortSetup();
@@ -357,9 +390,10 @@ void SetupHardware(TrainerData *data)
     sei();                                              // Enable global interrupts
 }
 
-void ReadData(uint8_t *buf, uint8_t size)
+// Returns 1 if valid data packet received, else returns 0 for invalid data or read timeout
+uint8_t ReadData(uint8_t *buf, uint8_t size)
 {
-    USART_ReadBuffer(buf, size);
+    USB_ReadBuffer(buf, size);
     if ((buf[0] != 0xAA) || (buf[1] != 0x01))
     {
         // if we're here then the packet contains unexpected data, just log for now
@@ -370,12 +404,14 @@ void ReadData(uint8_t *buf, uint8_t size)
         // todo: handle this situation, possibly means we're out of sync
         //       and receiving part way though a packet? read in the remaining
         //       bytes until we get back in sync?
+        return 0;
     }
+    return 1;
 }
 
 void WriteData(uint8_t *buf, uint8_t size)
 {
-    USART_SendBuffer(buf, size);
+    USB_SendBuffer(buf, size);
 }
 
 void GetButtonStatus(TrainerData *data)
@@ -383,7 +419,7 @@ void GetButtonStatus(TrainerData *data)
     static uint8_t last_buttons = 0;
     uint8_t cur_buttons;
 
-    PORTB ^= (1 << 0);                                  // Toggle the debug LED on port B0
+    //PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
 
     // in lieu of debounce support, just make sure we don't send
     // multiple lap button presses in a row, as probably not what
@@ -459,7 +495,11 @@ static int total_speed_init;
             load = 50;
 
         // Look up the required resistance level for current speed and estimated power
+#ifdef LOOKUP_TABLE
         position = LookupResistance(avg_speed, load);
+#else
+        position = GetResistance(avg_speed, load);
+#endif
 
         if (position < 1)
             position = 1;
@@ -484,7 +524,11 @@ static int total_speed_init;
         load = data->target_load / 10.0;
 
         // Look up the required resistance level for current speed and estimated power
+#ifdef LOOKUP_TABLE
         position = LookupResistance(avg_speed, load);
+#else
+        position = GetResistance(avg_speed, load);
+#endif
 
         if (position < 1)
             position = 1;
@@ -533,7 +577,15 @@ void PrepareStatusMessage(uint8_t *buf, TrainerData *data)
     buf[4] = data->current_position;
 }
 
-ISR( TIMER1_OVF_vect)
+ISR(TIMER3_OVF_vect)
+{
+    // timer3 overflow interrupt, will get here 100ms after the start of a read operation.
+    // Setting the timer value to 0 will abort the read if it's still in progress
+    TCCR3B |= 0;                                        // Stop the timer
+    TCNT3 = 0;                                          // Reset timer value to 0
+}
+
+ISR(TIMER1_OVF_vect)
 {
     static uint8_t count = 0;
     uint8_t i;
@@ -544,19 +596,19 @@ ISR( TIMER1_OVF_vect)
     if (++count == 5)
     {
         count = 0;
-//        PORTB ^= (1 << 0);                                  // Toggle the debug LED on port B0
+//        PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
 
-        // save the state of PINS C0 to C3
+        // save the state of PINS F4 to F7
         // todo: add debouncing
         //
-        // C0 - Enter
-        // C1 - Minus
-        // C2 - Plus
-        // C3 - Cancel
+        // F4 - Enter
+        // F5 - Minus
+        // F6 - Plus
+        // F7 - Cancel
         //
-        for (i=0 ; i<4 ; i++)
+        for (i=4 ; i<8 ; i++)
         {
-            if (!(PINC & (1<<i)))
+            if (!(PINF & (1<<i)))
                 buttons |= (1<<i);
         }
     }
@@ -565,8 +617,8 @@ ISR( TIMER1_OVF_vect)
 #ifdef DEBUG_OUTPUT
 static int uart_putc(char c, FILE *unused)
 {
-    while (!(UCSR0A & (1 << UDRE0)));
-    UDR0 = c;
+    while (!(UCSR1A & (1 << UDRE1)));
+    UDR1 = c;
     return 0;
 }
 
@@ -577,6 +629,7 @@ int main()
 {
     uint8_t RequestBuffer[BT_REQUEST_SIZE];
     uint8_t ResponseBuffer[BT_RESPONSE_SIZE];
+    uint8_t control_msg;
 
     TrainerData data;
 
@@ -588,25 +641,32 @@ int main()
 
     while (1)
     {
-        // read the control message from the pc
-        // todo: currently blocks forever, add timeout
-        ReadData(RequestBuffer, BT_REQUEST_SIZE);
+        // read the control message from the pc, times out after 100ms
+        // returns 1 for success, 0 for invalid data or timeout
+        // Can expect valid control messages from GC every 200ms
+        control_msg = ReadData(RequestBuffer, BT_REQUEST_SIZE);
 
-        ProcessControlMessage(RequestBuffer, &data);
+        // only update the trainer data structure following a valid control message
+        if (control_msg)
+            ProcessControlMessage(RequestBuffer, &data);
 
-        // calculate required motor position
+        // calculate required motor position, do this anyway for 100ms refresh
         CalculatePosition(&data);
 
-        // move motor towards required position
+        // move motor towards required position, do this anyway for 100ms refresh
         MotorController(&data);
 
-        // get the current button status
+        // get the current button status, do this anyway for 100ms refresh
         GetButtonStatus(&data);
 
-        // update response packet with button and position data
-        PrepareStatusMessage(ResponseBuffer, &data);
+        // Only send a reply back to GC in response to a valid control message
+        if (control_msg)
+        {
+            // update response packet with button and position data
+            PrepareStatusMessage(ResponseBuffer, &data);
 
-        // update pc with current status
-        WriteData(ResponseBuffer, BT_RESPONSE_SIZE);
+            // update pc with current status
+            WriteData(ResponseBuffer, BT_RESPONSE_SIZE);
+        }
     }
 }

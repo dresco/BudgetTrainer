@@ -7,7 +7,7 @@ firmware:
 
  - Refine calibration and resistance calculation
  - migrate to USB part
- - add timeout to serial comms & support for disconnected (no PC) mode
+ - add support for disconnected (no PC) mode
  - handle invalid serial data a bit better (sync to start of message?)
  - move hard coded calibration data to EEPROM and configure from PC
 
