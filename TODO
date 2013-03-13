@@ -1,17 +1,16 @@
 
 software:
-
  -
 
 firmware:
 
  - Refine calibration and resistance calculation
- - migrate to USB part
+ - only create 2nd CDC-ACM interface when built with debug support
  - add support for disconnected (no PC) mode
  - handle invalid serial data a bit better (sync to start of message?)
  - move hard coded calibration data to EEPROM and configure from PC
 
 hardware:
 
- -
+ - check linearity and accuracy of motor positioning
 
