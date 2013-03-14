@@ -66,7 +66,7 @@
 #include "LUFA/Drivers/Board/LEDs.h"
 #include "LUFA/Drivers/USB/USB.h"
 
-#define DEBUG_OUTPUT
+//#define DEBUG_OUTPUT
 #define LOOKUP_TABLE
 
 // Buttons
@@ -116,13 +116,16 @@ typedef struct TableEntry
 #define ARM_RADIUS          19.0                        // Effective radius of the servo arm in mm
 #define LINEAR_TRAVEL       30                          // Required linear travel in mm
 #define X_AXIS_MAX          (LINEAR_TRAVEL/ARM_RADIUS)/2// Maximum point on x-axis (unit circle)
-#define SERVO_RES           100.00                      // Target resolution of 100 positions (99 steps between so make it a double)
-#define SERVO_MIDSTEP       (SERVO_RES+1)/2             // Assuming starting at 1, there are 99 steps, mid-way is 50.5
+#define SERVO_MIN           1                           // Minimum motor position
+#define SERVO_MAX           100.00                      // Target resolution of 100 positions (99 steps between so make it a double)
+#define SERVO_MIDSTEP       (SERVO_MAX+SERVO_MIN)/2     // Assuming starting at 1, there are 99 steps, mid-way is 50.5
 
-#define SPEED_SAMPLES       10                          // How many speed samples to average (note: sampled at 2x update rate)
-#define POWER_SAMPLES       100                         // How many power samples to average (note: sampled at 10x update rate)
+#define SPEED_SAMPLES       8                           // How many speed samples to average (note: sampled at 2x update rate)
+#define POWER_SAMPLES       20                          // How many power samples to average (note: sampled at 10x update rate)
 #define MAX_TRIM            10                          // Maximum change to calculated resistance, based on real-time power vs load
 #define TRIM_DELAY          50                          // How many samples at constant load before attempting to trim resistance
+#define TRIM_WAIT           20                          // How many samples since last trim value update before adjusting again
+#define TRIM_THRESHOLD      2.5                         // Percentage difference between power & load before trim is attempted
 
 #define RECEIVE_INTERVAL    6250                        // 100ms receive timeout (clk/256 prescaler)
 

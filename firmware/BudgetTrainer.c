@@ -26,7 +26,7 @@
 volatile uint8_t buttons = 0;
 
 // global debug buffer
-char DebugBuffer[64];
+char DebugBuffer[128];
 
 // LUFA CDC Class driver interface configuration and state information. This structure is
 // passed to all CDC Class driver functions, so that multiple instances of the same class
@@ -296,21 +296,21 @@ void MotorController(TrainerData *data)
 #ifdef DEBUG_OUTPUT
     angle_rad = asin(X_AXIS_MAX);                       // Maximum rotational angle in radians
     angle_deg = angle_rad * 180 / M_PI;                 // Convert radians to degrees
-    sprintf(DebugBuffer, "max x_axis %f\n", X_AXIS_MAX);
+    sprintf(DebugBuffer, "max x_axis %f\r\n", X_AXIS_MAX);
     USB_SendDebugBuffer(DebugBuffer);
-    sprintf(DebugBuffer, "max angle_rad %f\n", angle_rad);
+    sprintf(DebugBuffer, "max angle_rad %f\r\n", angle_rad);
     USB_SendDebugBuffer(DebugBuffer);
-    sprintf(DebugBuffer, "max angle_deg %f\n", angle_deg);
+    sprintf(DebugBuffer, "max angle_deg %f\r\n", angle_deg);
     USB_SendDebugBuffer(DebugBuffer);
 #endif
 
     target_position = data->target_position;
     current_position = data->current_position;
 
-    if ((target_position >= 1) && (target_position <= SERVO_RES))
+    if ((target_position >= SERVO_MIN) && (target_position <= SERVO_MAX))
     {
 #ifdef DEBUG_OUTPUT
-        sprintf(DebugBuffer, "Target position %i\n", target_position);
+        sprintf(DebugBuffer, "Target position %i\r\n", target_position);
         USB_SendDebugBuffer(DebugBuffer);
 #endif
 
@@ -344,7 +344,7 @@ void MotorController(TrainerData *data)
                 SERVO_DEGREE*2);                        //   required angle (in given direction)
 
 #ifdef DEBUG_OUTPUT
-        sprintf(DebugBuffer, "Setting x_axis to %f, arm angle to %f, servo pulse to %i\n",
+        sprintf(DebugBuffer, "Setting x_axis to %f, arm angle to %f, servo pulse to %i\r\n",
                 x_axis, angle_deg, OCR1A);
         USB_SendDebugBuffer(DebugBuffer);
 #endif
@@ -354,7 +354,7 @@ void MotorController(TrainerData *data)
     else
     {
 #ifdef DEBUG_OUTPUT
-        sprintf(DebugBuffer, "Invalid entry, please try again...\n");
+        sprintf(DebugBuffer, "Invalid entry, please try again...\r\n");
         USB_SendDebugBuffer(DebugBuffer);
 #endif
     }
@@ -421,7 +421,7 @@ void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
                 PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
 
 #ifdef DEBUG_OUTPUT
-                sprintf(DebugBuffer, "timeout while reading data buffer\n");
+                sprintf(DebugBuffer, "timeout while reading data buffer\r\n");
                 USB_SendDebugBuffer(DebugBuffer);
 #endif
                 BuffToRead[0] = 0x00;
@@ -462,7 +462,7 @@ uint8_t ReadData(uint8_t *buf, uint8_t size)
     {
         // if we're here then the packet contains unexpected data, just log for now
 #ifdef DEBUG_OUTPUT
-        sprintf(DebugBuffer, "packet contains unexpected data\n");
+        sprintf(DebugBuffer, "packet contains unexpected data\r\n");
         USB_SendDebugBuffer(DebugBuffer);
 #endif
 
@@ -514,6 +514,7 @@ static int total_speed_init;
     // do we really want to do this? will ramp up from 0 over
     // a couple of seconds without - which may be preferable,
     // and what about the start of subsequent erg files?
+    // fixme: better initialisation for average speed & power values
     if (total_speed_init == 0)
     {
         total_speed = data->current_speed / 10.0 * SPEED_SAMPLES;
@@ -529,10 +530,10 @@ static int total_speed_init;
         avg_speed = data->current_speed / 10.0;
         position = data->target_gradient / 2.5;
 
-        if (position < 1)
-            position = 1;
-        if (position > SERVO_RES)
-            position = SERVO_RES;
+        if (position < SERVO_MIN)
+            position = SERVO_MIN;
+        if (position > SERVO_MAX)
+            position = SERVO_MAX;
 
         data->target_position = position;
     }
@@ -567,10 +568,10 @@ static int total_speed_init;
         position = GetResistance(avg_speed, load);
 #endif
 
-        if (position < 1)
-            position = 1;
-        if (position > SERVO_RES)
-            position = SERVO_RES;
+        if (position < SERVO_MIN)
+            position = SERVO_MIN;
+        if (position > SERVO_MAX)
+            position = SERVO_MAX;
 
         data->target_position = position;
     }
@@ -609,7 +610,6 @@ static int total_speed_init;
         position = GetResistance(avg_speed, load);
 #endif
 
-
         //
         // Trim the selected resistance based on real-time power data.
         //
@@ -627,13 +627,13 @@ static int total_speed_init;
                 trim_countdown--;
         }
 
-        // Only attempt to trim the resistance if load has been static for at
-        // least 5 seconds
+        // Only attempt to change the trim value after appropriate interval
         if (!trim_countdown)
         {
             // If the difference between requested load and average power is
-            // greater than 5% of the load, then trim the resistance value
-            if (abs(load - avg_power) > (load/20))
+            // greater than TRIM_THRESHPOLD percentage of the load, then
+            // attempt to trim the resistance value
+            if (abs(load - avg_power) > (load / (100.0/TRIM_THRESHOLD)))
             {
                 if (avg_power > load)
                 {
@@ -645,44 +645,49 @@ static int total_speed_init;
                     if (trim < MAX_TRIM)
                         trim++;
                 }
-            }
-
-            // Ensure that applying the trim doesn't overflow our data type,
-            // and adjust the position accordingly
-            if (trim)
-            {
-                if ((position + trim >= 1) && (position + trim <= SERVO_RES))
-                {
-                    position = position + trim;
-#ifdef DEBUG_OUTPUT
-                    sprintf(DebugBuffer, "trim applied successfully: %i\n", trim);
-                    USB_SendDebugBuffer(DebugBuffer);
-#endif
-                }
-                else
-                {
-#ifdef DEBUG_OUTPUT
-                    sprintf(DebugBuffer, "trim would exceed valid range\n");
-                    USB_SendDebugBuffer(DebugBuffer);
-#endif
-                }
+                // Once adjusted, give things a chance to settle at this new level
+                trim_countdown = TRIM_WAIT;
             }
         }
 
-        if (position < 1)
-            position = 1;
-        if (position > SERVO_RES)
-            position = SERVO_RES;
+        // Ensure that applying the trim doesn't overflow our data type,
+        // and adjust the position accordingly
+        if (trim)
+        {
+            if ((position + trim >= SERVO_MIN) && (position + trim <= SERVO_MAX))
+            {
+                position = position + trim;
+#ifdef DEBUG_OUTPUT
+                sprintf(DebugBuffer, "trim applied successfully: %i\r\n", trim);
+                USB_SendDebugBuffer(DebugBuffer);
+#endif
+            }
+            else
+            {
+#ifdef DEBUG_OUTPUT
+                sprintf(DebugBuffer, "trim would exceed valid range\r\n");
+                USB_SendDebugBuffer(DebugBuffer);
+#endif
+            }
+        }
+
+        if (position < SERVO_MIN)
+            position = SERVO_MIN;
+        if (position > SERVO_MAX)
+            position = SERVO_MAX;
 
         data->target_position = position;
 
         // save the current load
         last_load = load;
+
+        sprintf(DebugBuffer, "speed: %5.2f, avg_speed: %5.2f, power: %6.2f, avg_power: %6.2f, load: %6.2f, trim_countdown: %2i, trim: %2i, position: %3i\r\n", speed, avg_speed, power, avg_power, load, trim_countdown, trim, position);
+        USB_SendDebugBuffer(DebugBuffer);
     }
 
     // speed override, if lower than 5kph set resistance to minimum
     if (avg_speed < 5)
-        data->target_position = 1;
+        data->target_position = SERVO_MIN;
 }
 
 void ProcessControlMessage(uint8_t *buf, TrainerData *data)
