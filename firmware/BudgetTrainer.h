@@ -128,6 +128,7 @@ typedef struct TableEntry
 #define TRIM_THRESHOLD      2.5                         // Percentage difference between power & load before trim is attempted
 
 #define RECEIVE_INTERVAL    6250                        // 100ms receive timeout (clk/256 prescaler)
+#define MISSED_MSG_TIMEOUT  50                          // Timeout the session after 50 missed control messages (set minimum resistance etc)
 
 // LUFA LED support macros
 #define LEDMASK_USB_NOTREADY     LEDS_LED1              // Interface not ready

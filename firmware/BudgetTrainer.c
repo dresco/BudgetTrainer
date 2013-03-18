@@ -690,6 +690,15 @@ static int total_speed_init;
         data->target_position = SERVO_MIN;
 }
 
+void ResetData(TrainerData *data)
+{
+    // Session timed out, reset trainer data
+    data->target_gradient = 100;
+    data->target_load = 50;
+    data->current_speed = 0;
+    data->current_power = 0;
+}
+
 void ProcessControlMessage(uint8_t *buf, TrainerData *data)
 {
     // make sure it's a valid packet before retrieving data
@@ -795,7 +804,7 @@ int main()
 {
     uint8_t RequestBuffer[BT_REQUEST_SIZE];
     uint8_t ResponseBuffer[BT_RESPONSE_SIZE];
-    uint8_t control_msg;
+    uint8_t control_msg, missed_msg_count = 0;
 
     TrainerData data;
 
@@ -814,7 +823,18 @@ int main()
 
         // only update the trainer data structure following a valid control message
         if (control_msg)
+        {
             ProcessControlMessage(RequestBuffer, &data);
+            missed_msg_count = 0;
+        }
+        else
+        {
+            if (missed_msg_count < MISSED_MSG_TIMEOUT)
+                missed_msg_count++;
+
+            if (missed_msg_count == MISSED_MSG_TIMEOUT)
+                ResetData(&data);
+        }
 
         // calculate required motor position, do this anyway for 100ms refresh
         CalculatePosition(&data);
