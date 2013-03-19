@@ -574,28 +574,50 @@ uint8_t TrimResistance(uint8_t position, double load, double speed, double avera
     return position;
 }
 
-double AverageSpeed(double speed)
+double AverageSpeed(uint8_t mode, double speed)
 {
     static double total_speed;
+    static uint8_t last_mode;
     double average_speed;
 
-    total_speed -= total_speed / SPEED_SAMPLES;     // keep 9/10
-    total_speed += speed;                           // and add in 1/10 from the new sample
-    average_speed = total_speed / SPEED_SAMPLES;    // and use composite rolling average
+    if (mode == last_mode)
+    {
+        total_speed -= total_speed / SPEED_SAMPLES;     // keep 9/10
+        total_speed += speed;                           // and add in 1/10 from the new sample
+        average_speed = total_speed / SPEED_SAMPLES;    // and use composite rolling average
+    }
+    else
+    {
+        // Start of a session, set the average to the first data values
+        average_speed = speed;
+        total_speed = (average_speed * SPEED_SAMPLES);
+    }
 
+    last_mode = mode;
     return average_speed;
 }
 
-double AveragePower(double power)
+double AveragePower(uint8_t mode, double power)
 {
     static double total_power;
+    static uint8_t last_mode;
     double average_power;
 
-    total_power -= total_power / POWER_SAMPLES;     // keep 9/10
-    total_power += power;                           // and add in 1/10 from the new sample
-    average_power = total_power / POWER_SAMPLES;    // and use composite rolling average
+    if (mode == last_mode)
+    {
+        total_power -= total_power / POWER_SAMPLES;     // keep 9/10
+        total_power += power;                           // and add in 1/10 from the new sample
+        average_power = total_power / POWER_SAMPLES;    // and use composite rolling average
+    }
+    else
+    {
+        // Start of a session, set the average to the first data values
+        average_power = power;
+        total_power = (average_power * POWER_SAMPLES);
+    }
 
-    return average_power;
+   last_mode = mode;
+   return average_power;
 }
 
 void CalculatePosition(TrainerData *data)
@@ -611,7 +633,7 @@ void CalculatePosition(TrainerData *data)
     // note that (since adding the receive timout logic) we get here
     // 10 times per second, but we only expect 5 updates per second
     // from GC, so only averaging half the actual sample depth
-    avg_speed = AverageSpeed(speed);
+    avg_speed = AverageSpeed(data->mode, speed);
 
     // Convert realtime power into watts
     power = data->current_power / 10.0;
@@ -619,7 +641,7 @@ void CalculatePosition(TrainerData *data)
     // Track average values for the realtime power
     // note that power is only updated once a second (from PowerTap)
     // so we see 10 samples here per possible change in value
-    avg_power = AveragePower(power);
+    avg_power = AveragePower(data->mode, power);
 
     if (data->mode == BT_CALIBRATE)
     {
@@ -699,7 +721,7 @@ void CalculatePosition(TrainerData *data)
 
     // speed override, if lower than 5kph set resistance to minimum
     if (avg_speed < 5)
-        position = data->target_position = SERVO_MIN;
+        data->target_position = SERVO_MIN;
 }
 
 void ResetData(TrainerData *data)
@@ -709,6 +731,7 @@ void ResetData(TrainerData *data)
     data->target_load = 500;
     data->current_speed = 0;
     data->current_power = 0;
+    data->mode = 0;
 }
 
 void ProcessControlMessage(uint8_t *buf, TrainerData *data)
