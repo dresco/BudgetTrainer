@@ -499,28 +499,127 @@ void GetButtonStatus(TrainerData *data)
     buttons = 0;
 }
 
-void CalculatePosition(TrainerData *data)
+uint8_t TrimResistance(uint8_t position, double load, double speed, double average_speed, double power, double average_power)
 {
-    uint8_t position;
-    double speed, power, load, slope;
-    double avg_speed = 0, avg_power = 0;
-    static double total_speed, total_power, last_load;
+    static double last_load;
     static int8_t trim = 0, trim_countdown = 50;
 
-#if 1
-static int total_speed_init;
-
-    // correctly initialise total_speed on first pass.
-    // do we really want to do this? will ramp up from 0 over
-    // a couple of seconds without - which may be preferable,
-    // and what about the start of subsequent erg files?
-    // fixme: better initialisation for average speed & power values
-    if (total_speed_init == 0)
+    // If the requested load has changed, reset the trim value to 0,
+    // and reset the countdown timer to 5 seconds.
+    if (last_load != load)
     {
-        total_speed = data->current_speed / 10.0 * SPEED_SAMPLES;
-        total_speed_init = 1;
+        trim = 0;
+        trim_countdown = TRIM_DELAY;
     }
+    else
+    {
+        if (trim_countdown > 0)
+            trim_countdown--;
+    }
+
+    // Only attempt to change the trim value after appropriate interval
+    if (!trim_countdown)
+    {
+        // If the difference between requested load and average power is
+        // greater than TRIM_THRESHOLD percentage of the load, then
+        // attempt to trim the resistance value
+        if (abs(load - average_power) > (load / (100.0/TRIM_THRESHOLD)))
+        {
+            if (average_power > load)
+            {
+                if (trim > -MAX_TRIM)
+                    trim--;
+            }
+            else if (average_power < load)
+            {
+                if (trim < MAX_TRIM)
+                    trim++;
+            }
+            // Once adjusted, give things a chance to settle at this new level
+            trim_countdown = TRIM_WAIT;
+        }
+    }
+
+    // Ensure that applying the trim doesn't overflow our data type,
+    // and adjust the position accordingly
+    if (trim)
+    {
+        if ((position + trim >= SERVO_MIN) && (position + trim <= SERVO_MAX))
+        {
+            position = position + trim;
+#ifdef DEBUG_OUTPUT
+            sprintf(DebugBuffer, "trim applied successfully: %i\r\n", trim);
+            USB_SendDebugBuffer(DebugBuffer);
 #endif
+        }
+        else
+        {
+#ifdef DEBUG_OUTPUT
+            sprintf(DebugBuffer, "trim would exceed valid range\r\n");
+            USB_SendDebugBuffer(DebugBuffer);
+#endif
+        }
+    }
+
+    // save the current load
+    last_load = load;
+
+    // Print trim diagnostics message - not treated as debug output for now..
+    sprintf(DebugBuffer, "speed: %5.2f, avg_speed: %5.2f, power: %6.2f, avg_power: %6.2f, "
+                         "load: %6.2f, trim_countdown: %2i, trim: %2i, position: %3i\r\n",
+                         speed, average_speed, power, average_power,
+                         load, trim_countdown, trim, position);
+    USB_SendDebugBuffer(DebugBuffer);
+
+    return position;
+}
+
+double AverageSpeed(double speed)
+{
+    static double total_speed;
+    double average_speed;
+
+    total_speed -= total_speed / SPEED_SAMPLES;     // keep 9/10
+    total_speed += speed;                           // and add in 1/10 from the new sample
+    average_speed = total_speed / SPEED_SAMPLES;    // and use composite rolling average
+
+    return average_speed;
+}
+
+double AveragePower(double power)
+{
+    static double total_power;
+    double average_power;
+
+    total_power -= total_power / POWER_SAMPLES;     // keep 9/10
+    total_power += power;                           // and add in 1/10 from the new sample
+    average_power = total_power / POWER_SAMPLES;    // and use composite rolling average
+
+    return average_power;
+}
+
+void CalculatePosition(TrainerData *data)
+{
+    uint8_t position = 1;
+    double speed, power, slope, load = 0;
+    double avg_speed, avg_power;
+
+    // Convert realtime speed into kph
+    speed = data->current_speed / 10.0;
+
+    // Track average values for the realtime speed
+    // note that (since adding the receive timout logic) we get here
+    // 10 times per second, but we only expect 5 updates per second
+    // from GC, so only averaging half the actual sample depth
+    avg_speed = AverageSpeed(speed);
+
+    // Convert realtime power into watts
+    power = data->current_power / 10.0;
+
+    // Track average values for the realtime power
+    // note that power is only updated once a second (from PowerTap)
+    // so we see 10 samples here per possible change in value
+    avg_power = AveragePower(power);
 
     if (data->mode == BT_CALIBRATE)
     {
@@ -545,14 +644,6 @@ static int total_speed_init;
         // into a fractional slope (i.e. -5% = -0.05, 0% = 0.0, 10% = 0.1)
         slope = (((data->target_gradient / 10.0) - 10) / 100);
 
-        // Convert realtime speed into kph
-        speed = data->current_speed / 10.0;
-
-        // Track average values for the realtime speed
-        total_speed -= total_speed / SPEED_SAMPLES;     // keep 9/10
-        total_speed += speed;                           // and add in 1/10 from the new sample
-        avg_speed = total_speed / SPEED_SAMPLES;        // and use composite rolling average
-
         // Estimate the required power to achieve current speed & slope
         load = GetVirtualPower(avg_speed, slope);
 
@@ -568,6 +659,10 @@ static int total_speed_init;
         position = GetResistance(avg_speed, load);
 #endif
 
+        // If we're moving, trim the selected resistance based on real-time power data
+        if ((uint8_t)avg_speed)
+            position = TrimResistance(position, load, speed, avg_speed, power, avg_power);
+
         if (position < SERVO_MIN)
             position = SERVO_MIN;
         if (position > SERVO_MAX)
@@ -575,30 +670,10 @@ static int total_speed_init;
 
         data->target_position = position;
     }
+
     if (data->mode == BT_ERGOMODE)
     {
         // in ergo mode
-
-        // Convert realtime speed into kph
-        speed = data->current_speed / 10.0;
-
-        // Convert realtime power into watts
-        power = data->current_power / 10.0;
-
-        // Track average values for the realtime speed
-        // note that (since adding the receive timout logic) we get here
-        // 10 times per second, but we only expect 5 updates per second
-        // from GC, so only averaging half the actual sample depth
-        total_speed -= total_speed / SPEED_SAMPLES;     // keep 9/10
-        total_speed += speed;                           // and add in 1/10 from the new sample
-        avg_speed = total_speed / SPEED_SAMPLES;        // and use composite rolling average
-
-        // Track average values for the realtime power
-        // note that power is only updated once a second (from PowerTap)
-        // so we see 10 samples here per possible change in value
-        total_power -= total_power / POWER_SAMPLES;     // keep 99/100
-        total_power += power;                           // and add in 1/100 from the new sample
-        avg_power = total_power / POWER_SAMPLES;        // and use composite rolling average
 
         // convert load into watts
         load = data->target_load / 10.0;
@@ -610,66 +685,9 @@ static int total_speed_init;
         position = GetResistance(avg_speed, load);
 #endif
 
-        //
-        // Trim the selected resistance based on real-time power data.
-        //
-
-        // If the requested load has changed, reset the trim value to 0,
-        // and reset the countdown timer to 5 seconds.
-        if (last_load != load)
-        {
-            trim = 0;
-            trim_countdown = TRIM_DELAY;
-        }
-        else
-        {
-            if (trim_countdown > 0)
-                trim_countdown--;
-        }
-
-        // Only attempt to change the trim value after appropriate interval
-        if (!trim_countdown)
-        {
-            // If the difference between requested load and average power is
-            // greater than TRIM_THRESHPOLD percentage of the load, then
-            // attempt to trim the resistance value
-            if (abs(load - avg_power) > (load / (100.0/TRIM_THRESHOLD)))
-            {
-                if (avg_power > load)
-                {
-                    if (trim > -MAX_TRIM)
-                        trim--;
-                }
-                else if (avg_power < load)
-                {
-                    if (trim < MAX_TRIM)
-                        trim++;
-                }
-                // Once adjusted, give things a chance to settle at this new level
-                trim_countdown = TRIM_WAIT;
-            }
-        }
-
-        // Ensure that applying the trim doesn't overflow our data type,
-        // and adjust the position accordingly
-        if (trim)
-        {
-            if ((position + trim >= SERVO_MIN) && (position + trim <= SERVO_MAX))
-            {
-                position = position + trim;
-#ifdef DEBUG_OUTPUT
-                sprintf(DebugBuffer, "trim applied successfully: %i\r\n", trim);
-                USB_SendDebugBuffer(DebugBuffer);
-#endif
-            }
-            else
-            {
-#ifdef DEBUG_OUTPUT
-                sprintf(DebugBuffer, "trim would exceed valid range\r\n");
-                USB_SendDebugBuffer(DebugBuffer);
-#endif
-            }
-        }
+        // If we're moving, trim the selected resistance based on real-time power data
+        if ((uint8_t)avg_speed)
+            position = TrimResistance(position, load, speed, avg_speed, power, avg_power);
 
         if (position < SERVO_MIN)
             position = SERVO_MIN;
@@ -677,24 +695,18 @@ static int total_speed_init;
             position = SERVO_MAX;
 
         data->target_position = position;
-
-        // save the current load
-        last_load = load;
-
-        sprintf(DebugBuffer, "speed: %5.2f, avg_speed: %5.2f, power: %6.2f, avg_power: %6.2f, load: %6.2f, trim_countdown: %2i, trim: %2i, position: %3i\r\n", speed, avg_speed, power, avg_power, load, trim_countdown, trim, position);
-        USB_SendDebugBuffer(DebugBuffer);
     }
 
     // speed override, if lower than 5kph set resistance to minimum
     if (avg_speed < 5)
-        data->target_position = SERVO_MIN;
+        position = data->target_position = SERVO_MIN;
 }
 
 void ResetData(TrainerData *data)
 {
     // Session timed out, reset trainer data
     data->target_gradient = 100;
-    data->target_load = 50;
+    data->target_load = 500;
     data->current_speed = 0;
     data->current_power = 0;
 }
