@@ -691,9 +691,8 @@ void CalculatePosition(TrainerData *data)
         // Get the required resistance level for current speed and estimated power
         position = GetResistance(avg_speed, load);
 
-        // If we're moving, trim the selected resistance based on real-time power data
-        if ((uint8_t)avg_speed)
-            position = TrimResistance(position, load, speed, avg_speed, power, avg_power);
+        // Trim the selected resistance based on real-time power data
+        position = TrimResistance(position, load, speed, avg_speed, power, avg_power);
 
         if (position < SERVO_MIN)
             position = SERVO_MIN;
@@ -713,9 +712,8 @@ void CalculatePosition(TrainerData *data)
         // Get the required resistance level for current speed and estimated power
         position = GetResistance(avg_speed, load);
 
-        // If we're moving, trim the selected resistance based on real-time power data
-        if ((uint8_t)avg_speed)
-            position = TrimResistance(position, load, speed, avg_speed, power, avg_power);
+        // Trim the selected resistance based on real-time power data
+        position = TrimResistance(position, load, speed, avg_speed, power, avg_power);
 
         if (position < SERVO_MIN)
             position = SERVO_MIN;
