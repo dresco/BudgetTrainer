@@ -770,6 +770,9 @@ void PrepareStatusMessage(uint8_t *buf, TrainerData *data)
     buf[2] = data->buttons;
     buf[3] = data->target_position;
     buf[4] = data->current_position;
+    buf[5] = 0x00;
+    buf[6] = 0x00;
+    buf[7] = 0x00;
 }
 
 ISR(TIMER3_OVF_vect)

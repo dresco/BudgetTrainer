@@ -52,6 +52,8 @@
 // 3             Target motor position (1 to 100)
 // 4             Current motor position (1 to 100)
 // 5             0x00 -- UNUSED
+// 6             0x00 -- UNUSED
+// 7             0x00 -- UNUSED
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,7 +84,7 @@
 
 // Define message sizes
 #define BT_REQUEST_SIZE 16
-#define BT_RESPONSE_SIZE 6
+#define BT_RESPONSE_SIZE 8
 
 typedef struct TrainerData
 {
