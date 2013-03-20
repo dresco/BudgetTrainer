@@ -228,7 +228,7 @@ double LookupResistance(double x_speed, double y_power)
 }
 #endif
 
-double GetVirtualPower(double speed, double slope)
+double CalculateVirtualPower(double speed, double slope)
 {
     //
     // Estimate the power required for a given speed & slope,
@@ -271,7 +271,7 @@ double GetVirtualPower(double speed, double slope)
 // Fitting function: Simple_SimpleEquation_33_model()
 // Fitting target: lowest sum of squared absolute error
 // Fitting target value = 7584.58195696
-double GetResistance(double x_in, double y_in)
+double CalculateResistance(double x_in, double y_in)
 {
 
     double temp;
@@ -285,6 +285,20 @@ double GetResistance(double x_in, double y_in)
     temp = (a+y_in)/(b+c*x_in);
     return temp;
 }
+
+uint8_t GetResistance(double speed, double load)
+{
+    uint8_t position;
+
+#ifdef LOOKUP_TABLE
+        position = LookupResistance(speed, load);
+#else
+        position = CalculateResistance(speed, load);
+#endif
+
+    return position;
+}
+
 
 void MotorController(TrainerData *data)
 {
@@ -667,19 +681,15 @@ void CalculatePosition(TrainerData *data)
         slope = (((data->target_gradient / 10.0) - 10) / 100);
 
         // Estimate the required power to achieve current speed & slope
-        load = GetVirtualPower(avg_speed, slope);
+        load = CalculateVirtualPower(avg_speed, slope);
 
         // watch out for those downhills! ;)
         // the current resistance model appears to break down at low wattage
         if (load < 50)
             load = 50;
 
-        // Look up the required resistance level for current speed and estimated power
-#ifdef LOOKUP_TABLE
-        position = LookupResistance(avg_speed, load);
-#else
+        // Get the required resistance level for current speed and estimated power
         position = GetResistance(avg_speed, load);
-#endif
 
         // If we're moving, trim the selected resistance based on real-time power data
         if ((uint8_t)avg_speed)
@@ -700,12 +710,8 @@ void CalculatePosition(TrainerData *data)
         // convert load into watts
         load = data->target_load / 10.0;
 
-        // Look up the required resistance level for current speed and estimated power
-#ifdef LOOKUP_TABLE
-        position = LookupResistance(avg_speed, load);
-#else
+        // Get the required resistance level for current speed and estimated power
         position = GetResistance(avg_speed, load);
-#endif
 
         // If we're moving, trim the selected resistance based on real-time power data
         if ((uint8_t)avg_speed)
