@@ -537,7 +537,8 @@ uint8_t TrimResistance(uint8_t position, double load, double speed, double avera
         // If the difference between requested load and average power is
         // greater than TRIM_THRESHOLD percentage of the load, then
         // attempt to trim the resistance value
-        if (abs(load - average_power) > (load / (100.0/TRIM_THRESHOLD)))
+        // Only attempt to trim if power is not 0
+        if (average_power && (abs(load - average_power) > (load / (100.0/TRIM_THRESHOLD))))
         {
             if (average_power > load)
             {
