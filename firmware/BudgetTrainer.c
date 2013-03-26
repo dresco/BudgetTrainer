@@ -509,6 +509,16 @@ void GetButtonStatus(TrainerData *data)
     if (last_buttons & BT_ENTER)
         data->buttons &= ~BT_ENTER;
 
+    // add support for offline mode button presses
+    // ...
+    if (data->offline_mode != OFFLINE_STATUS_ONLINE)
+    {
+        if ((cur_buttons & BT_PLUS) || (cur_buttons & BT_MINUS))
+            data->offline_mode = OFFLINE_STATUS_MANUAL;
+        if (cur_buttons & BT_CANCEL)
+            data->offline_mode = OFFLINE_STATUS_IDLE;
+    }
+
     last_buttons = cur_buttons;
     buttons = 0;
 }
@@ -658,6 +668,24 @@ void CalculatePosition(TrainerData *data)
     // so we see 10 samples here per possible change in value
     avg_power = AveragePower(data->mode, power);
 
+    if (data->offline_mode == OFFLINE_STATUS_MANUAL)
+    {
+        // In 'manual' offline mode
+        // Allow control of the resistance levels through the handlebar controller
+
+        if (data->buttons & BT_PLUS)
+            position++;
+        if (data->buttons & BT_MINUS)
+            position--;
+
+        if (position < SERVO_MIN)
+            position = SERVO_MIN;
+        if (position > SERVO_MAX)
+            position = SERVO_MAX;
+
+        data->target_position = position;
+    }
+
     if (data->mode == BT_CALIBRATE)
     {
         // in calibration mode
@@ -725,18 +753,27 @@ void CalculatePosition(TrainerData *data)
     }
 
     // speed override, if lower than 5kph set resistance to minimum
-    if (avg_speed < 5)
+    //  - but only if not in 'manual' offline mode (where resistance is
+    //    being controlled by the handlebar controller).
+    if ((avg_speed < 5) && (data->offline_mode |= OFFLINE_STATUS_MANUAL))
         data->target_position = SERVO_MIN;
 }
 
 void ResetData(TrainerData *data)
 {
-    // Session timed out, reset trainer data
+    // Session timed out, reset trainer data.
+    // Doesn't explicitly change the resistance, but setting the speed to
+    // zero here triggers the logic in CalculatePosition() to set minimum
+    // resistance if under threshold low average speed.
     data->target_gradient = 100;
     data->target_load = 500;
     data->current_speed = 0;
     data->current_power = 0;
     data->mode = 0;
+
+    // If we were previously in online mode, then set offline mode
+    if (data->offline_mode == OFFLINE_STATUS_ONLINE)
+        data->offline_mode = OFFLINE_STATUS_IDLE;
 }
 
 void ProcessControlMessage(uint8_t *buf, TrainerData *data)
@@ -760,6 +797,10 @@ void ProcessControlMessage(uint8_t *buf, TrainerData *data)
         data->current_power = buf[10];
         data->current_power <<= 8;
         data->current_power |= buf[9];
+
+        // Not in offline mode
+        data->offline_mode = OFFLINE_STATUS_ONLINE;
+
     }
 }
 
@@ -850,6 +891,7 @@ int main()
     uint8_t control_msg, missed_msg_count = 0;
 
     TrainerData data;
+    data.offline_mode = OFFLINE_STATUS_IDLE;
 
     SetupHardware(&data);
     LEDs_SetAllLEDs(LEDMASK_USB_NOTREADY);
@@ -879,14 +921,15 @@ int main()
                 ResetData(&data);
         }
 
+        // get the current button status, do this anyway for 100ms refresh
+        GetButtonStatus(&data);
+
         // calculate required motor position, do this anyway for 100ms refresh
         CalculatePosition(&data);
 
         // move motor towards required position, do this anyway for 100ms refresh
         MotorController(&data);
 
-        // get the current button status, do this anyway for 100ms refresh
-        GetButtonStatus(&data);
 
         // Only send a reply back to GC in response to a valid control message
         if (control_msg)

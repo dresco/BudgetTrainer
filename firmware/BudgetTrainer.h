@@ -86,9 +86,15 @@
 #define BT_REQUEST_SIZE 16
 #define BT_RESPONSE_SIZE 8
 
+// Define offline operation modes
+#define OFFLINE_STATUS_IDLE     0       // Offline - no controller buttons pressed (or cancel)
+#define OFFLINE_STATUS_MANUAL   1       // Offline - buttons pressed to enable manual control
+#define OFFLINE_STATUS_ONLINE   2       // Online  - GC training mode underway
+
 typedef struct TrainerData
 {
     uint8_t mode;
+    uint8_t offline_mode;
     uint8_t buttons;
 
     uint8_t target_gradient;
