@@ -1,15 +1,19 @@
 
 software:
+
  -
 
 firmware:
 
- - Refine calibration and resistance calculation
- - only create 2nd CDC-ACM interface when built with debug support
  - add support for disconnected (no PC) mode
+ - evaluate box averaging for speed/power
+ - move TrimResistance() diagnostic output into regular debug output
+ - only create 2nd CDC-ACM interface when built with debug support
+ - Refine calibration and resistance calculation
  - move hard coded calibration data to EEPROM and configure from PC
 
 hardware:
 
+ - build up stripbpoard proto with linear reg
+ - start schematic design & pcb layout
  - check linearity and accuracy of motor positioning
-
