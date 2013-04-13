@@ -671,6 +671,8 @@ void CalculatePosition(TrainerData *data)
         // In 'manual' offline mode
         // Allow control of the resistance levels through the handlebar controller
 
+        position = data->target_position;
+
         if (data->buttons & BT_PLUS)
             position++;
         if (data->buttons & BT_MINUS)
@@ -760,7 +762,7 @@ void CalculatePosition(TrainerData *data)
     // speed override, if lower than 5kph set resistance to minimum
     //  - but only if not in 'manual' offline mode (where resistance is
     //    being controlled by the handlebar controller).
-    if ((avg_speed < 5) && (data->offline_mode |= OFFLINE_STATUS_MANUAL))
+    if ((avg_speed < 5) && (data->offline_mode != OFFLINE_STATUS_MANUAL))
         data->target_position = SERVO_MIN;
 }
 
