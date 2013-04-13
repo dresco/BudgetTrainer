@@ -828,7 +828,6 @@ ISR(TIMER3_OVF_vect)
 ISR(TIMER1_OVF_vect)
 {
     static uint8_t count = 0;
-    uint8_t i;
 
     // we get here every 20ms, so process buttons every 5th interval for 10Hz
     // - just ensuring it's more frequent than the comms with the PC to ensure
@@ -846,11 +845,17 @@ ISR(TIMER1_OVF_vect)
         // F6 - Plus
         // F7 - Cancel
         //
-        for (i=4 ; i<8 ; i++)
-        {
-            if (!(PINF & (1<<i)))
-                buttons |= (1<<i);
-        }
+        if (!(PINF & (1<<4)))
+            buttons |= (1 << 0);
+
+        if (!(PINF & (1<<5)))
+            buttons |= (1 << 1);
+
+        if (!(PINF & (1<<6)))
+            buttons |= (1 << 2);
+
+        if (!(PINF & (1<<7)))
+            buttons |= (1 << 3);
     }
 }
 
