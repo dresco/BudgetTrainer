@@ -299,7 +299,6 @@ uint8_t GetResistance(double speed, double load)
     return position;
 }
 
-
 void MotorController(TrainerData *data)
 {
     uint8_t target_position;
@@ -523,7 +522,7 @@ void GetButtonStatus(TrainerData *data)
     buttons = 0;
 }
 
-uint8_t TrimResistance(uint8_t position, double load, double speed, double average_speed, double power, double average_power)
+uint8_t TrimResistance(uint8_t position, double load, double average_power, int8_t *ptr_trim, int8_t *ptr_trim_countdown)
 {
     static double last_load;
     static int8_t trim = 0, trim_countdown = 50;
@@ -589,12 +588,10 @@ uint8_t TrimResistance(uint8_t position, double load, double speed, double avera
     // save the current load
     last_load = load;
 
-    // Print trim diagnostics message - not treated as debug output for now..
-    sprintf(DebugBuffer, "speed: %5.2f, avg_speed: %5.2f, power: %6.2f, avg_power: %6.2f, "
-                         "load: %6.2f, trim_countdown: %2i, trim: %2i, position: %3i\r\n",
-                         speed, average_speed, power, average_power,
-                         load, trim_countdown, trim, position);
-    USB_SendDebugBuffer(DebugBuffer);
+    // Copy the current trim state into the pointers passed into this function
+    // (only required for diagnostics output from calling function)
+    *ptr_trim = trim;
+    *ptr_trim_countdown = trim_countdown;
 
     return position;
 }
@@ -648,6 +645,7 @@ double AveragePower(uint8_t mode, double power)
 void CalculatePosition(TrainerData *data)
 {
     uint8_t position = 1;
+    int8_t trim = 0, trim_countdown = 0;
     double speed, power, slope, load = 0;
     double avg_speed, avg_power;
 
@@ -721,7 +719,7 @@ void CalculatePosition(TrainerData *data)
         position = GetResistance(avg_speed, load);
 
         // Trim the selected resistance based on real-time power data
-        position = TrimResistance(position, load, speed, avg_speed, power, avg_power);
+        position = TrimResistance(position, load, avg_power, &trim, &trim_countdown);
 
         if (position < SERVO_MIN)
             position = SERVO_MIN;
@@ -742,7 +740,7 @@ void CalculatePosition(TrainerData *data)
         position = GetResistance(avg_speed, load);
 
         // Trim the selected resistance based on real-time power data
-        position = TrimResistance(position, load, speed, avg_speed, power, avg_power);
+        position = TrimResistance(position, load, avg_power, &trim, &trim_countdown);
 
         if (position < SERVO_MIN)
             position = SERVO_MIN;
@@ -751,6 +749,13 @@ void CalculatePosition(TrainerData *data)
 
         data->target_position = position;
     }
+
+    // Print trim diagnostics message - not treated as debug output for now..
+    sprintf(DebugBuffer, "speed: %5.2f, avg_speed: %5.2f, power: %6.2f, avg_power: %6.2f, "
+                         "load: %6.2f, trim_countdown: %2i, trim: %2i, position: %3i\r\n",
+                         speed, avg_speed, power, avg_power,
+                         load, trim_countdown, trim, position);
+    USB_SendDebugBuffer(DebugBuffer);
 
     // speed override, if lower than 5kph set resistance to minimum
     //  - but only if not in 'manual' offline mode (where resistance is
