@@ -451,6 +451,9 @@ void SetupHardware(TrainerData *data)
     MCUSR &= ~(1 << WDRF);                              // Disable watchdog if enabled by bootloader/fuses
     wdt_disable();
 
+    MCUCR = (1<<JTD);                                   // Disable JTAG if enabled by fuses
+    MCUCR = (1<<JTD);
+
     clock_prescale_set(clock_div_1);                    // Disable clock prescaler (for 8MHz operation)
 
     LEDs_Init();
