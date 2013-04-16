@@ -306,7 +306,7 @@ void MotorController(TrainerData *data)
 
     double x_axis, angle_rad, angle_deg;
 
-#ifdef DEBUG_OUTPUT
+#if DEBUG_OUTPUT >= DEBUG_LEVEL_MAX
     angle_rad = asin(X_AXIS_MAX);                       // Maximum rotational angle in radians
     angle_deg = angle_rad * 180 / M_PI;                 // Convert radians to degrees
     sprintf(DebugBuffer, "max x_axis %f\r\n", X_AXIS_MAX);
@@ -322,7 +322,7 @@ void MotorController(TrainerData *data)
 
     if ((target_position >= SERVO_MIN) && (target_position <= SERVO_MAX))
     {
-#ifdef DEBUG_OUTPUT
+#if DEBUG_OUTPUT >= DEBUG_LEVEL_MAX
         sprintf(DebugBuffer, "Target position %i\r\n", target_position);
         USB_SendDebugBuffer(DebugBuffer);
 #endif
@@ -356,7 +356,7 @@ void MotorController(TrainerData *data)
         OCR1A = SERVO_MIDPOINT - (angle_deg *           // Timing value to get servo rotation to
                 SERVO_DEGREE*2);                        //   required angle (in given direction)
 
-#ifdef DEBUG_OUTPUT
+#if DEBUG_OUTPUT >= DEBUG_LEVEL_MAX
         sprintf(DebugBuffer, "Setting x_axis to %f, arm angle to %f, servo pulse to %i\r\n",
                 x_axis, angle_deg, OCR1A);
         USB_SendDebugBuffer(DebugBuffer);
@@ -366,7 +366,7 @@ void MotorController(TrainerData *data)
     }
     else
     {
-#ifdef DEBUG_OUTPUT
+#if DEBUG_OUTPUT >= DEBUG_LEVEL_MAX
         sprintf(DebugBuffer, "Invalid entry, please try again...\r\n");
         USB_SendDebugBuffer(DebugBuffer);
 #endif
@@ -433,7 +433,7 @@ void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
             {
                 PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
 
-#ifdef DEBUG_OUTPUT
+#if DEBUG_OUTPUT >= DEBUG_LEVEL_MAX
                 sprintf(DebugBuffer, "timeout while reading data buffer\r\n");
                 USB_SendDebugBuffer(DebugBuffer);
 #endif
@@ -477,7 +477,7 @@ uint8_t ReadData(uint8_t *buf, uint8_t size)
     if ((buf[0] != 0xAA) || (buf[1] != 0x01))
     {
         // if we're here then the packet contains unexpected data, just log for now
-#ifdef DEBUG_OUTPUT
+#if DEBUG_OUTPUT >= DEBUG_LEVEL_MAX
         sprintf(DebugBuffer, "packet contains unexpected data\r\n");
         USB_SendDebugBuffer(DebugBuffer);
 #endif
@@ -574,14 +574,14 @@ uint8_t TrimResistance(uint8_t position, double load, double average_power, int8
         if ((position + trim >= SERVO_MIN) && (position + trim <= SERVO_MAX))
         {
             position = position + trim;
-#ifdef DEBUG_OUTPUT
+#if DEBUG_OUTPUT >= DEBUG_LEVEL_MAX
             sprintf(DebugBuffer, "trim applied successfully: %i\r\n", trim);
             USB_SendDebugBuffer(DebugBuffer);
 #endif
         }
         else
         {
-#ifdef DEBUG_OUTPUT
+#if DEBUG_OUTPUT >= DEBUG_LEVEL_MAX
             sprintf(DebugBuffer, "trim would exceed valid range\r\n");
             USB_SendDebugBuffer(DebugBuffer);
 #endif
@@ -755,12 +755,14 @@ void CalculatePosition(TrainerData *data)
         data->target_position = position;
     }
 
-    // Print trim diagnostics message - not treated as debug output for now..
+#if DEBUG_OUTPUT >= DEBUG_LEVEL_MIN
+    // Print trim diagnostics message
     sprintf(DebugBuffer, "speed: %5.2f, avg_speed: %5.2f, power: %6.2f, avg_power: %6.2f, "
                          "load: %6.2f, trim_countdown: %2i, trim: %2i, position: %3i\r\n",
                          speed, avg_speed, power, avg_power,
                          load, trim_countdown, trim, position);
     USB_SendDebugBuffer(DebugBuffer);
+#endif
 
     // speed override, if lower than 5kph set resistance to minimum
     //  - but only if not in 'manual' offline mode (where resistance is

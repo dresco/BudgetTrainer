@@ -68,7 +68,12 @@
 #include "LUFA/Drivers/Board/LEDs.h"
 #include "LUFA/Drivers/USB/USB.h"
 
-//#define DEBUG_OUTPUT
+#define DEBUG_LEVEL_NONE  0
+#define DEBUG_LEVEL_MIN   1
+#define DEBUG_LEVEL_MID   2
+#define DEBUG_LEVEL_MAX   3
+#define DEBUG_OUTPUT      DEBUG_LEVEL_MIN
+
 #define LOOKUP_TABLE
 
 // Buttons
