@@ -75,6 +75,7 @@
 #define DEBUG_OUTPUT      DEBUG_LEVEL_MIN
 
 #define LOOKUP_TABLE
+//#define SERVO_ARM                       // Using a servo arm with linkage instead of a pulley
 
 // Buttons
 #define BT_PLUS           0x04
@@ -126,9 +127,16 @@ typedef struct TableEntry
 #define SERVO_MAX_DIFF      600                         // 0.6ms change in output pulse for max angle
 #define SERVO_DEGREE        6.25                        // Nominally 5.555us per degree of rotation (1000/180),
                                                         // but measured at ~6.25us (625us per 100 degrees rotation)
-#define ARM_RADIUS          19.0                        // Effective radius of the servo arm in mm
+
 #define LINEAR_TRAVEL       30                          // Required linear travel in mm
+
+#define ARM_RADIUS          19.0                        // Effective radius of the servo arm in mm
 #define X_AXIS_MAX          (LINEAR_TRAVEL/ARM_RADIUS)/2// Maximum point on x-axis (unit circle)
+
+#define PULLEY_RADIUS       11.2                        // Radius of the servo pulley in mm
+#define ROTATION_MAX        (LINEAR_TRAVEL \
+                            / PULLEY_RADIUS)/2          // Maximum rotation from centre angle in radians
+
 #define SERVO_MIN           1                           // Minimum motor position
 #define SERVO_MAX           100.00                      // Target resolution of 100 positions (99 steps between so make it a double)
 #define SERVO_MIDSTEP       (SERVO_MAX+SERVO_MIN)/2     // Assuming starting at 1, there are 99 steps, mid-way is 50.5

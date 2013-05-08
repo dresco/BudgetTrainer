@@ -307,10 +307,16 @@ void MotorController(TrainerData *data)
     double x_axis, angle_rad, angle_deg;
 
 #if DEBUG_OUTPUT >= DEBUG_LEVEL_MAX
+#ifdef SERVO_ARM
     angle_rad = asin(X_AXIS_MAX);                       // Maximum rotational angle in radians
+#else
+    angle_rad = ROTATION_MAX;
+#endif
     angle_deg = angle_rad * 180 / M_PI;                 // Convert radians to degrees
+#ifdef SERVO_ARM
     sprintf(DebugBuffer, "max x_axis %f\r\n", X_AXIS_MAX);
     USB_SendDebugBuffer(DebugBuffer);
+#endif
     sprintf(DebugBuffer, "max angle_rad %f\r\n", angle_rad);
     USB_SendDebugBuffer(DebugBuffer);
     sprintf(DebugBuffer, "max angle_deg %f\r\n", angle_deg);
@@ -344,6 +350,7 @@ void MotorController(TrainerData *data)
                 current_position--;
         }
 
+#ifdef SERVO_ARM
         // CHECK MY MATHS :)
         x_axis = (X_AXIS_MAX *
                  (current_position - SERVO_MIDSTEP))    // position should be signed plus/minus around the mid-point,
@@ -351,14 +358,27 @@ void MotorController(TrainerData *data)
                                                         // Check also correct for even numbers of steps?
 
         angle_rad = asin(x_axis);                       // Required rotational angle in radians
+#else
+        // using pulley instead of servo arm
+        x_axis = 0;                                     // Shush compiler warning
+        angle_rad = (ROTATION_MAX *
+                    (current_position - SERVO_MIDSTEP))
+                    / (SERVO_MIDSTEP -1);
+#endif
+
         angle_deg = angle_rad * 180 / M_PI;             // Convert radians to degrees
 
         OCR1A = SERVO_MIDPOINT - (angle_deg *           // Timing value to get servo rotation to
                 SERVO_DEGREE*2);                        //   required angle (in given direction)
 
 #if DEBUG_OUTPUT >= DEBUG_LEVEL_MAX
+#ifdef SERVO_ARM
         sprintf(DebugBuffer, "Setting x_axis to %f, arm angle to %f, servo pulse to %i\r\n",
                 x_axis, angle_deg, OCR1A);
+#else
+        sprintf(DebugBuffer, "Setting servo angle to %f, servo pulse to %i\r\n",
+                angle_deg, OCR1A);
+#endif
         USB_SendDebugBuffer(DebugBuffer);
 #endif
 
