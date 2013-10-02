@@ -451,7 +451,7 @@ void USB_ReadBuffer(uint8_t* BuffToRead, uint8_t BuffSize)
             // Invalidate the data header and abort the receive if the timer has expired
             if (TCNT3 == 0)
             {
-                PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
+                //PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
 
 #if DEBUG_OUTPUT >= DEBUG_LEVEL_MAX
                 sprintf(DebugBuffer, "timeout while reading data buffer\r\n");
@@ -584,6 +584,14 @@ uint8_t TrimResistance(uint8_t position, double load, double average_power, int8
             }
             // Once adjusted, give things a chance to settle at this new level
             trim_countdown = TRIM_WAIT;
+        }
+
+        if (average_power  < 1)    // takes an age to get to zero with current averaging..
+        {
+            //reset trim if average power is 0 (i.e. we've stopped)
+            // avoids having spin up against extra resistance..
+            PORTE ^= (1 << 6);                                  // Toggle the debug LED on port E6
+            trim = 0;
         }
     }
 
@@ -775,6 +783,12 @@ void CalculatePosition(TrainerData *data)
         data->target_position = position;
     }
 
+    // speed override, if lower than 10kph set resistance to minimum
+    //  - but only if not in 'manual' offline mode (where resistance is
+    //    being controlled by the handlebar controller).
+    if ((avg_speed < 10) && (data->offline_mode != OFFLINE_STATUS_MANUAL))
+        data->target_position = position = SERVO_MIN;
+
 #if DEBUG_OUTPUT >= DEBUG_LEVEL_MIN
     // Print trim diagnostics message
     sprintf(DebugBuffer, "speed: %5.2f, avg_speed: %5.2f, power: %6.2f, avg_power: %6.2f, "
@@ -784,11 +798,6 @@ void CalculatePosition(TrainerData *data)
     USB_SendDebugBuffer(DebugBuffer);
 #endif
 
-    // speed override, if lower than 5kph set resistance to minimum
-    //  - but only if not in 'manual' offline mode (where resistance is
-    //    being controlled by the handlebar controller).
-    if ((avg_speed < 5) && (data->offline_mode != OFFLINE_STATUS_MANUAL))
-        data->target_position = SERVO_MIN;
 }
 
 void ResetData(TrainerData *data)

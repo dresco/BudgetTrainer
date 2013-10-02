@@ -133,7 +133,7 @@ typedef struct TableEntry
 #define ARM_RADIUS          19.0                        // Effective radius of the servo arm in mm
 #define X_AXIS_MAX          (LINEAR_TRAVEL/ARM_RADIUS)/2// Maximum point on x-axis (unit circle)
 
-#define PULLEY_RADIUS       11.2                        // Radius of the servo pulley in mm
+#define PULLEY_RADIUS       10.6                        // Radius of the servo pulley in mm
 #define ROTATION_MAX        (LINEAR_TRAVEL \
                             / PULLEY_RADIUS)/2          // Maximum rotation from centre angle in radians
 
