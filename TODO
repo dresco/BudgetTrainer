@@ -9,6 +9,8 @@ firmware:
  - only create 2nd CDC-ACM interface when built with debug support
  - Refine calibration and resistance calculation
  - move hard coded calibration data to EEPROM and configure from PC
+ - start reporting speed and power in the trainer data stream
+ - request USB ID's
 
 hardware:
 

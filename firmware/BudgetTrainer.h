@@ -51,9 +51,18 @@
 // 2             Buttons - 0x01 = Enter, 0x02 = Minus, 0x04 = Plus, 0x08 = Cancel
 // 3             Target motor position (1 to 100)
 // 4             Current motor position (1 to 100)
-// 5             0x00 -- UNUSED
-// 6             0x00 -- UNUSED
-// 7             0x00 -- UNUSED
+// 5             Realtime speed - Lo Byte
+// 6             Realtime speed - Hi Byte
+// 7             Realtime power - Lo Byte
+// 8             Realtime power - Hi Byte
+// 9             0x00 -- UNUSED
+// 10            0x00 -- UNUSED
+// 11            0x00 -- UNUSED
+// 12            0x00 -- UNUSED
+// 13            0x00 -- UNUSED
+// 14            0x00 -- UNUSED
+// 15            0x00 -- UNUSED
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,7 +99,7 @@
 
 // Define message sizes
 #define BT_REQUEST_SIZE 16
-#define BT_RESPONSE_SIZE 8
+#define BT_RESPONSE_SIZE 16
 
 // Define offline operation modes
 #define OFFLINE_STATUS_IDLE     0       // Offline - no controller buttons pressed (or cancel)

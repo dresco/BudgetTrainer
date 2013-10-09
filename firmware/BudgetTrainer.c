@@ -853,9 +853,22 @@ void PrepareStatusMessage(uint8_t *buf, TrainerData *data)
     buf[2] = data->buttons;
     buf[3] = data->target_position;
     buf[4] = data->current_position;
-    buf[5] = 0x00;
-    buf[6] = 0x00;
-    buf[7] = 0x00;
+
+    // encode the high and low bytes for current power and speed
+    // for now just copied directly from the inbound control message
+    buf[5] = data->current_speed & 0xFF;
+    buf[6] = (data->current_speed >> 8) & 0xFF;
+    buf[7] = data->current_power & 0xFF;
+    buf[8] = (data->current_power >> 8) & 0xFF;
+
+    // zero out the rest of the message bytes
+    buf[9] = 0x00;
+    buf[10] = 0x00;
+    buf[11] = 0x00;
+    buf[12] = 0x00;
+    buf[13] = 0x00;
+    buf[14] = 0x00;
+    buf[15] = 0x00;
 }
 
 ISR(TIMER3_OVF_vect)
